@@ -4002,6 +4002,17 @@
 				}
 			}
 		});
+		
+		// Este código percorre todas as camadas e remove os Rasters (PNG/TIF) do arranque
+		map.eachLayer(function (layer) {
+			if (layer instanceof L.ImageOverlay) {
+				map.removeLayer(layer);
+			}
+		});
+
+		// Força o mapa a atualizar e libertar memória
+		map.invalidateSize();
+		console.log("Estabilização Mobile: Rasters removidos do arranque.");
         </script>        
     </body>
 </html>
