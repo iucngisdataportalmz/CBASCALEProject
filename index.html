@@ -23,6 +23,7 @@
             padding: 0;
             margin: 0;
         }
+		
 		/* Barra de Título no Topo */
         .header-title {
             position: fixed;
@@ -30,7 +31,7 @@
             left: 0;
             width: 100%;
             height: 60px; /* Altura da barra */
-            background-color: #2c3e50; /* Cor de fundo escura profissional */
+            background-color: #ebf3f1; /* Cor de fundo verde cinza */
             color: white;
             display: flex;
             align-items: center;
@@ -48,11 +49,23 @@
             top: 60px; /* Mesma altura da barra acima */
             bottom: 0;
             width: 100%;
+			
+		
+		/* Remove o recuo global do Leaflet para não quebrar o resto do mapa */
+		.leaflet-top {
+			top: 0 !important;
+		}
+
+		/* Altera UNICAMENTE os botões de + e - do Zoom, dando espaço para a barra de título */
+		.leaflet-control-zoom {
+			margin-top: 60px !important;
+		}
+		
         }
         .layer-list-title {
             padding: 8px 10px;
             font-weight: bold;
-            background-color: #f8f9fa;
+            background-color: #ebf3f1;
             text-align: center;
             border-bottom: 1px solid #ccc;
             margin-bottom: 5px;
@@ -61,7 +74,7 @@
             border-radius: 4px 4px 0 0;
         }
         .export-button {
-            background-color: white;
+            background-color: #ebf3f1;
             padding: 5px;
             cursor: pointer;
             border: 2px solid rgba(0,0,0,0.2);
@@ -75,7 +88,7 @@
             color: #333;
         }
 		.intersect-button {
-            background-color: white;
+            background-color: #ebf3f1;
             padding: 5px;
             cursor: pointer;
             border: 2px solid rgba(0,0,0,0.2);
@@ -89,7 +102,7 @@
             color: #333;
         }
         .intersect-button:hover {
-            background-color: #f4f4f4;
+            background-color: #ebf3f1;
             color: #e67e22;
         }
 		/* Aba de Info Flutuante */
@@ -99,7 +112,7 @@
             right: auto; /* Anula a direita */;
 			left: 10px;  /* Coloca na esquerda */
             z-index: 3000;
-            background: white;
+            background: #ebf3f1;
             padding: 10px;
             border-radius: 50%; /* Começa como um círculo */
             width: 24px;
@@ -139,7 +152,7 @@
         .info-icon {
             font-weight: bold;
             font-size: 16px;
-            color: #2c3e50;
+            color: #0f435e;
         }
 
         .info-tab:hover .info-icon {
@@ -152,13 +165,13 @@
             right: 20px;
             width: 300px;
             height: 220px;
-            background: white;
+            background: #ebf3f1;
             z-index: 3000;
             display: none; /* Escondido por padrão */
             padding: 10px;
             border-radius: 8px;
             box-shadow: 0 2px 15px rgba(0,0,0,0.4);
-            border: 1px solid #2c3e50;
+            border: 1px solid #0f435e;
         }
 		/* Ícone da Impressora */
 		.leaflet-control-browser-print a::before {
@@ -176,7 +189,7 @@
 			font-weight: 900;
 			display: block;
 			line-height: 30px;
-			color: #333;
+			color: #0f435e;
 		}
 		
 		/* BOTÃO */
@@ -184,8 +197,8 @@
 		  position: absolute;
 		  bottom: 60px;
 		  right: 20px;
-		  background: #2c3e50;
-		  color: white;
+		  background: #ebf3f1;
+		  color: #0f435e;
 		  padding: 8px 12px;
 		  border-radius: 5px;
 		  cursor: pointer;
@@ -201,7 +214,7 @@
 		  width: 260px;
 		  max-height: 400px;
 		  overflow-y: auto;
-		  background: white;
+		  background: #ebf3f1;
 		  padding: 10px;
 		  border-radius: 6px;
 		  font-size: 12px;
@@ -226,11 +239,11 @@
 		
 		#download-toggle {
 		  position: absolute;
-		  top: 680px;
+		  top: 780px;
 		  left: 10px;
 		  z-index: 9999; /* MUITO IMPORTANTE */
-		  background: #27ae60;
-		  color: white;
+		  background: #ebf3f1;
+		  color: #0f435e;
 		  padding: 10px 14px;
 		  border-radius: 6px;
 		  cursor: pointer;
@@ -243,7 +256,7 @@
 		  top: 560px;
 		  left: 200px;
 		  width: 230px;
-		  background: white;
+		  background: #ebf3f1;
 		  padding: 12px;
 		  border-radius: 6px;
 		  z-index: 9999; /* MUITO IMPORTANTE */
@@ -264,7 +277,7 @@
 		}
 
 		.btn-mapa {
-			background-color: white;
+			background-color: #ebf3f1;
 			border: 2px solid rgba(0,0,0,0.2);
 			border-radius: 4px;
 			width: 40px;
@@ -278,22 +291,24 @@
 		}
 
 		.btn-mapa:hover {
-			background-color: #f4f4f4;
+			background-color: #ebf3f1;
 		}
 		
 		#container-logos {
-			position: absolute;
-			top: 0px;
-			left: 0px;
-			z-index: 10001; /* Fica acima de tudo */
+			position: fixed; /* Mudado de absolute para fixed para isolar o elemento do mapa */
+			top: 0px; /* Ajustado ligeiramente para não colar no topo absoluto */
+			left: 0px; /* Alinhado com a margem dos outros elementos */
+			z-index: 99999; /* Aumentado drasticamente para ficar acima de qualquer atualização do Leaflet */
 			display: flex;
 			flex-direction: row;
-			gap: 15px; /* Espaço entre os dois logos */
-			background: rgba(255, 255, 255, 0.8); /* Fundo semi-transparente para dar destaque */
+			gap: 15px; 
+			background: rgba(235, 243, 241, 0.9); /* Adicionado um toque de transparência (opcional) */
 			padding: 5px 10px;
 			border-radius: 5px;
-			pointer-events: none; /* Permite clicar através do logo se necessário */
+			pointer-events: none; 
+			box-shadow: 0 1px 4px rgba(0,0,0,0.2); /* Uma leve sombra para não sumir no mapa */
 		}
+		
 
 		.logo-projeto {
 			height: 50px; /* Ajuste a altura conforme necessário */
@@ -303,7 +318,7 @@
         <title>CBA SCALE+ WebPortal for 4 Districts in Inhambane</title>
     </head>
     <body>
-		<div class="header-title">
+		<div class="header-title" style="color: #0f435e;">
             GIS Data Portal on Ecosystems for Four Districts in Inhambane Province
         </div>
 			<div class="info-tab">
@@ -366,12 +381,12 @@
 		</div>
 		
 		<!-- PAINEL DOWNLOAD -->
-		<div id="download-toggle">Baixar imagens temáticas</div>
+		<div id="download-toggle" style="color: #0F435E;">Baixar imagens temáticas </div>
 		
 		<div id="download-panel">
 
 		  <h4>Uso e Cobertura de Terra</h4>
-		  <a href="https://www.dropbox.com/scl/fi/3cr49xix7ehkmme1230pr/IUCN_lulc_2020_baseline_27022026.tif?rlkey=zwr9ha0rinmjd2wsm3408fuau&dl=1" target="_blank">Raster LULC 2020 (tiff)</a><br>
+		  <a href="https://www.dropbox.com/scl/fi/3cr49xix7ehkmme1230pr/IUCN_lulc_2020_baseline_27022026.tif?rlkey=zwr9ha0rinmjd2wsm3408fuau&dl=1" target="_blank">LULC 2020 (tiff)</a><br>
 		  <a href="https://www.dropbox.com/scl/fi/rtdnwuel9xpp5otq54h0z/IUCN_lulc_2024_actual_27022026.tif?rlkey=97pfylctg4jfxnb90kfxkzi3f&dl=1" target="_blank">LULC 2024 (tiff)</a><br>
 		  <a href="https://www.dropbox.com/scl/fi/fljshil2eauy74rq6v7lt/IUCN_lulcc_2020_2024_27022026.tif?rlkey=w2ztijhl6jnxechlbaywuzhgt&dl=0" target="_blank">Mudança de Uso e Cobertura</a><br>
 
@@ -3572,7 +3587,7 @@
         lay.addTo(map);
 		// --- 1. ADICIONA O TÍTULO ---
         var layerContainer = lay.getContainer();
-        layerContainer.insertAdjacentHTML('afterbegin', '<div class="layer-list-title">Lista de Dados</div>');
+		layerContainer.insertAdjacentHTML('afterbegin', '<div class="layer-list-title" style="color: #0f435e;">Lista de Dados</div>');
 
         // --- 2. FUNÇÃO DE EXPORTAÇÃO SELETIVA ATUALIZADA ---
 		var ExportControl = L.Control.extend({
@@ -3583,6 +3598,7 @@
 				button.innerHTML = '<i class="fas fa-download"></i>';
 				button.title = 'Baixar dados visíveis/ativos';
 				button.style.cursor = 'pointer';
+				button.style.color = '#0f435e';
 
 				button.onclick = function() {
 					var geoJsonLayers = {
@@ -3974,7 +3990,7 @@
 				
 				button.href = '#';
 				button.title = 'Encontrar Mais Próximo';
-				button.style.backgroundColor = 'white';
+				button.style.backgroundColor = '#ebf3f1';
 				button.style.width = '30px';
 				button.style.height = '30px';
 				button.style.display = 'flex';
@@ -3986,7 +4002,7 @@
 					L.DomEvent.stopPropagation(e);
 					L.DomEvent.preventDefault(e);
 					
-					var choice = prompt("O que deseja encontrar mais próximo?\n1. Escolas\n2. Saúde\n3. Cidades/Vilas\n4. Grandes Cidades/Vilas\n5. Locais Povoados\n6. Centros de Pesca\\n7. Comunidades do projecro CBA SCALE+");
+					var choice = prompt("O que deseja encontrar mais próximo?\n1. Escolas\n2. Saúde\n3. Cidades/Vilas\n4. Grandes Cidades/Vilas\n5. Locais Povoados\n6. Centros de Pesca\n7. Comunidades do projecro CBA SCALE+");
 					
 					if (choice) {
 						// Indica visualmente que o mapa está em modo de seleção
@@ -4149,9 +4165,11 @@
 			if (legendVisible) {
 				legend.style.display = "block";
 				this.innerHTML = "Ocultar a legenda";
+				this.style.color = "#0f435e";
 			} else {
 				legend.style.display = "none";
 				this.innerHTML = "Legenda";
+				this.style.color = "#0f435e";
 			}
 		};
 		
