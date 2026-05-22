@@ -3604,8 +3604,20 @@
 				button.title = 'Baixar dados visíveis/ativos';
 				button.style.cursor = 'pointer';
 				button.style.color = '#0f435e';
+				
+				// Mantém a consistência visual com os outros botões do painel esquerdo
+				button.style.backgroundColor = '#ebf3f1';
+				button.style.width = '30px';
+				button.style.height = '30px';
+				button.style.display = 'flex';
+				button.style.alignItems = 'center';
+				button.style.justifyContent = 'center';
 
-				button.onclick = function() {
+				button.onclick = function(e) {
+					L.DomEvent.stopPropagation(e);
+					L.DomEvent.preventDefault(e);
+
+					// Mapeamento completo dos objetos JSON e instâncias de Layer carregadas
 					var geoJsonLayers = {
 						"Distritos": { layer: typeof layer_Districts_36 !== 'undefined' ? layer_Districts_36 : null, data: typeof json_Districts_36 !== 'undefined' ? json_Districts_36 : null },
 						"Postos Administrativos": { layer: typeof layer_AdministrativePosts_37 !== 'undefined' ? layer_AdministrativePosts_37 : null, data: typeof json_AdministrativePosts_37 !== 'undefined' ? json_AdministrativePosts_37 : null },
@@ -3638,123 +3650,294 @@
 					var activeLayers = [];
 					for (var name in geoJsonLayers) {
 						var item = geoJsonLayers[name];
-						// NOVA LÓGICA: Verifica se a layer existe e se está visível no mapa (mesmo dentro de grupos)
 						if (item.layer && map.hasLayer(item.layer)) {
-							activeLayers.push(name);
+							activeLayers.push({ nome: name, data: item.data });
 						}
 					}
 
 					if (activeLayers.length === 0) {
-						alert("Ative uma camada vetorial no menu para exportar os dados.");
+						exibirMensagemExportacao("Aviso", "Ative pelo menos uma camada vetorial no menu lateral direito para poder exportar os dados.", "#e74c3c");
 						return;
 					}
 
-					var list = activeLayers.map((n, i) => (i+1) + ". " + n).join("\n");
-					var choice = prompt("CAMADAS ATIVAS ENCONTRADAS:\n\n" + list + "\n\nDigite o número correspondente:");
-					
-					var index = parseInt(choice) - 1;
-					if (!isNaN(index) && activeLayers[index]) {
-						var selected = activeLayers[index];
-						var geojsonData = geoJsonLayers[selected].data;
-						
-						var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(geojsonData));
-						var dl = document.createElement('a');
-						dl.setAttribute("href", dataStr);
-						dl.setAttribute("download", selected.toLowerCase().replace(/[^a-z0-9]/g, "_") + ".geojson");
-						document.body.appendChild(dl); // Necessário para alguns browsers
-						dl.click();
-						document.body.removeChild(dl);
-					}
+					// Abre a janela para escolha do utilizador
+					abrirMenuSelecaoExportacao(activeLayers);
 				};
 				return container;
 			}
 		});
 		map.addControl(new ExportControl());
+
+		// --- FUNÇÕES DE INTERFACE PARA A FERRAMENTA DE EXPORTAÇÃO ---
+
+		function fecharModalExportacao() {
+			var modal = document.getElementById('modal-export-container');
+			if (modal) { modal.remove(); }
+		}
+
+		function abrirMenuSelecaoExportacao(activeLayers) {
+			fecharModalExportacao();
+
+			// Cria dinamicamente as tags <option> apenas para as camadas que estão ligadas
+			var optionsHtml = "";
+			activeLayers.forEach((layer, index) => {
+				optionsHtml += `<option value="${index}">${index + 1}. ${layer.nome}</option>`;
+			});
+
+			// Guarda temporariamente os dados na janela global para serem lidos pela função de disparo do download
+			window.camadasAtivasProntasParaExportar = activeLayers;
+
+			var modalHtml = `
+				<div id="modal-export-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100005; display: flex; align-items: center; justify-content: center; font-family: 'Arial', sans-serif;">
+					<div style="background: #ebf3f1; padding: 25px; border-radius: 8px; width: 360px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f435e;">
+						<h3 style="margin-top: 0; color: #0f435e; text-align: center; border-bottom: 2px solid #ccc; padding-bottom: 8px;">Exportar Camada Ativa</h3>
+						<p style="font-size: 13px; color: #333; margin-bottom: 12px; text-align: center;">Selecione uma das camadas visíveis no mapa para descarregar em formato GeoJSON:</p>
+						
+						<select id="select-export-layer" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #0f435e; background: white; font-size: 13px; margin-bottom: 25px; max-height: 150px;">
+							${optionsHtml}
+						</select>
+
+						<div style="display: flex; justify-content: space-between;">
+							<button onclick="dispararDownloadGeoJSON()" style="background: #2ecc71; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 48%;">Descarregar</button>
+							<button onclick="fecharModalExportacao()" style="background: #ccc; color: #333; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 48%;">Cancelar</button>
+						</div>
+					</div>
+				</div>
+			`;
+
+			document.body.insertAdjacentHTML('beforeend', modalHtml);
+		}
+
+		function dispararDownloadGeoJSON() {
+			var selectIndex = document.getElementById('select-export-layer').value;
+			var listaCamadas = window.camadasAtivasProntasParaExportar;
+			fecharModalExportacao();
+
+			if (listaCamadas && listaCamadas[selectIndex]) {
+				var selectedLayer = listaCamadas[selectIndex];
+				var geojsonData = selectedLayer.data;
+
+				if (!geojsonData) {
+					exibirMensagemExportacao("Erro", "Não foi possível estruturar os objetos geométricos desta camada.", "#e74c3c");
+					return;
+				}
+
+				// Processo seguro de geração do ficheiro GeoJSON e clique em background
+				var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(geojsonData));
+				var dl = document.createElement('a');
+				dl.setAttribute("href", dataStr);
+				
+				// Formata o nome do arquivo limpando caracteres especiais
+				var nomeFicheiro = selectedLayer.nome.toLowerCase().replace(/[^a-z0-9]/g, "_") + ".geojson";
+				dl.setAttribute("download", nomeFicheiro);
+				
+				document.body.appendChild(dl);
+				dl.click();
+				dl.remove();
+
+				exibirMensagemExportacao("Sucesso!", `O download da camada <b>${selectedLayer.nome}</b> foi iniciado corretamente como <i>${nomeFicheiro}</i>.`, "#2ecc71");
+			}
+		}
+
+		// Substituição das mensagens clássicas de aviso por popups integrados
+		function exibirMensagemExportacao(titulo, mensagem, corDestaque) {
+			fecharModalExportacao();
+			var resultadoHtml = `
+				<div id="modal-export-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100005; display: flex; align-items: center; justify-content: center; font-family: 'Arial', sans-serif;">
+					<div style="background: #ebf3f1; padding: 20px; border-radius: 8px; width: 300px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid ${corDestaque};">
+						<h4 style="margin-top: 0; color: ${corDestaque}; font-size: 16px;">${titulo}</h4>
+						<p style="font-size: 13px; color: #333; line-height: 1.4; margin-bottom: 15px;">${mensagem}</p>
+						<button onclick="fecharModalExportacao()" style="background: ${corDestaque}; color: white; border: none; padding: 8px 25px; border-radius: 4px; cursor: pointer; font-weight: bold;">Fechar</button>
+					</div>
+				</div>
+			`;
+			document.body.insertAdjacentHTML('beforeend', resultadoHtml);
+		}
 		
 		// --- FERRAMENTA DE INTERSEÇÃO ---
-        var IntersectControl = L.Control.extend({
-            options: { position: 'topleft' },
-            onAdd: function (map) {
-                var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-                var button = L.DomUtil.create('a', 'intersect-button', container);
-                button.innerHTML = '<i class="fas fa-object-group"></i>';
-                button.title = 'Interseção: Pontos em Polígonos';
+		var IntersectControl = L.Control.extend({
+			options: { position: 'topleft' },
+			onAdd: function (map) {
+				var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+				var button = L.DomUtil.create('a', 'intersect-button', container);
+				button.innerHTML = '<i class="fas fa-object-group"></i>';
+				button.title = 'Interseção: Pontos em Polígonos';
 
-                button.onclick = function() {
-                    // Verificação se o Turf carregou
-                    if (typeof turf === 'undefined') {
-                        alert("Erro: A biblioteca Turf.js não carregou. Verifique a ligação à internet.");
-                        return;
-                    }
+				// Estilização base do botão para manter a consistência do painel esquerdo
+				button.style.backgroundColor = '#ebf3f1';
+				button.style.width = '30px';
+				button.style.height = '30px';
+				button.style.display = 'flex';
+				button.style.alignItems = 'center';
+				button.style.justifyContent = 'center';
+				button.style.cursor = 'pointer';
 
-                    // 1. Mapeamento das camadas com base no seu ficheiro atual
-                    var polygons = {
-                        "Distritos": typeof json_Districts_36 !== 'undefined' ? json_Districts_36 : null,
-                        "Postos Administrativos": typeof json_AdministrativePosts_37 !== 'undefined' ? json_AdministrativePosts_37 : null,
-                        "Áreas de Conservação": typeof json_ConservationAreas_33 !== 'undefined' ? json_ConservationAreas_33 : null,
-						"Áreas Humidas": typeof json_Wetlands_30 !== 'undefined' ? json_Wetlands_30 : null,
-						"Áreas Chaves de Biodiversidade": typeof json_KeyBiodiversityAreas_34 !== 'undefined' ? json_KeyBiodiversityAreas_34 : null,
-						"Áreas de Processos Evolutivos Chaves": typeof json_AreasofKeyEvolutionaryProcesses_32 !== 'undefined' ? json_AreasofKeyEvolutionaryProcesses_32 : null,
-						"Concessões Mineiras 2011": typeof json_MiningConcessions2011_40 !== 'undefined' ? json_MiningConcessions2011_40 : null,
-						"Concessões Mineiras 2018": typeof json_MiningConcessions2018_41 !== 'undefined' ? json_MiningConcessions2018_41 : null,
-						"Localidades": typeof json_Localities_38 !== 'undefined' ? json_Localities_38 : null
-                    };
-                    
-                    var points = {
-                        "Escolas": typeof json_Schools_52 !== 'undefined' ? json_Schools_52 : null,
-                        "Saúde": typeof json_HealthFacilities_53 !== 'undefined' ? json_HealthFacilities_53 : null,
-                        "Cidades/Vilas": typeof json_CitiesandVillages_43 !== 'undefined' ? json_CitiesandVillages_43 : null,
-						"Grandes Cidades/Vilas": typeof json_MajorCities_50 !== 'undefined' ? json_MajorCities_50 : null,
-                        "Locais Povoados": typeof json_PopulatedPlaces_45 !== 'undefined' ? json_PopulatedPlaces_45 : null,
-						"Centros de Pesca": typeof json_Fishingcenters_51 !== 'undefined' ? json_Fishingcenters_51 : null,
-						"Comunidades do Projecto CBA SCALE+": typeof json_CBA_SCALE_Communities_46 !== 'undefined' ? json_CBA_SCALE_Communities_46 : null
-                    };
+				button.onclick = function(e) {
+					L.DomEvent.stopPropagation(e);
+					L.DomEvent.preventDefault(e);
 
-                    // 2. Escolha da Área
-                    var polyChoice = prompt("Selecione a ÁREA (Polígono):\n1. Distritos\n2. Postos Administrativos\n3. Áreas de Conservação\n4. Áreas Humidas\n5. Áreas Chaves de Biodiversidade\n6. Áreas de Processos Evolutivos Chaves\n7. Concessões Mineiras 2011\n8. Concessões Mineiras 2018\n9. Localidades");
-                    var polyData = (polyChoice == "1") ? polygons["Distritos"] : (polyChoice == "2") ? polygons["Postos Administrativos"] : polygons["Localidades"];
+					if (typeof turf === 'undefined') {
+						alert("Erro: A biblioteca Turf.js não carregou. Verifique a ligação à internet.");
+						return;
+					}
 
-                    // 3. Escolha dos Pontos
-                    var pointChoice = prompt("Selecione os PONTOS:\n1. Escolas\n2. Saúde\n3. Cidades/Vilas\n4. Grandes Cidades/Vilas\n5. Locais Povoados\n6. Centros de Pesca\n7. Comunidades do Projecto CBA SCALE+");
-                    var pointData;
-                    if(pointChoice == "1") pointData = points["Escolas"];
-                    else if(pointChoice == "2") pointData = points["Saúde"];
-					else if(pointChoice == "3") pointData = points["Cidades/Vilas"];
-					else if(pointChoice == "4") pointData = points["Grandes Cidades/Vilas"];
-					else if(pointChoice == "5") pointData = points["Locais Povoados"];
-					else if(pointChoice == "6") pointData = points["Centros de Pesca"];
-                    else pointData = points["Comunidades do Projecto CBA SCALE+"];
+					// Abre a janela flutuante customizada
+					abrirMenuIntersecao();
+				};
+				return container;
+			}
+		});
+		map.addControl(new IntersectControl());
 
-                    if (!polyData || !pointData) {
-                        alert("Erro: Não foi possível encontrar os dados desta camada no ficheiro.");
-                        return;
-                    }
+		// --- FUNÇÕES DE INTERFACE PARA A FERRAMENTA DE INTERSEÇÃO ---
 
-                    try {
-                        // 4. Cálculo SIG (Turf)
-                        var ptsWithin = turf.pointsWithinPolygon(pointData, polyData);
+		function fecharModalIntersecao() {
+			var modal = document.getElementById('modal-intersect-container');
+			if (modal) { modal.remove(); }
+		}
 
-                        if (ptsWithin.features.length > 0) {
-                            alert("Sucesso! Foram encontrados " + ptsWithin.features.length + " pontos dentro da área selecionada.");
-                            
-                            // 5. Download automático do resultado
-                            var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(ptsWithin));
-                            var dl = document.createElement('a');
-                            dl.setAttribute("href", dataStr);
-                            dl.setAttribute("download", "resultado_intersecao.geojson");
-                            dl.click();
-                        } else {
-                            alert("Nenhum ponto encontrado dentro da área selecionada.");
-                        }
-                    } catch (err) {
-                        alert("Erro no processamento: " + err.message);
-                        console.error(err);
-                    }
-                };
-                return container;
-            }
-        });
-        map.addControl(new IntersectControl());
+		function abrirMenuIntersecao() {
+			fecharModalIntersecao();
+
+			// Dicionários estruturados para gerar as opções visuais
+			var listaPoligonos = [
+				{ id: "1", nome: "Distritos" },
+				{ id: "2", nome: "Postos Administrativos" },
+				{ id: "3", nome: "Áreas de Conservação" },
+				{ id: "4", nome: "Áreas Humidas" },
+				{ id: "5", nome: "Áreas Chaves de Biodiversidade" },
+				{ id: "6", nome: "Áreas de Processos Evolutivos Chaves" },
+				{ id: "7", nome: "Concessões Mineiras 2011" },
+				{ id: "8", nome: "Concessões Mineiras 2018" },
+				{ id: "9", nome: "Localidades" }
+			];
+
+			var listaPontos = [
+				{ id: "1", nome: "Escolas" },
+				{ id: "2", nome: "Saúde" },
+				{ id: "3", nome: "Cidades/Vilas" },
+				{ id: "4", nome: "Grandes Cidades/Vilas" },
+				{ id: "5", nome: "Locais Povoados" },
+				{ id: "6", nome: "Centros de Pesca" },
+				{ id: "7", nome: "Comunidades do Projecto CBA SCALE+" }
+			];
+
+			var polyOptionsHtml = "";
+			listaPoligonos.forEach(p => {
+				polyOptionsHtml += `<option value="${p.id}">${p.id}. ${p.nome}</option>`;
+			});
+
+			var pointOptionsHtml = "";
+			listaPontos.forEach(pt => {
+				pointOptionsHtml += `<option value="${pt.id}">${pt.id}. ${pt.nome}</option>`;
+			});
+
+			var modalHtml = `
+				<div id="modal-intersect-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100005; display: flex; align-items: center; justify-content: center; font-family: 'Arial', sans-serif;">
+					<div style="background: #ebf3f1; padding: 25px; border-radius: 8px; width: 360px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f435e;">
+						<h3 style="margin-top: 0; color: #0f435e; text-align: center; border-bottom: 2px solid #ccc; padding-bottom: 8px;">Análise de Interseção</h3>
+						
+						<div style="margin-top: 15px;">
+							<label style="font-size: 13px; font-weight: bold; color: #0f435e; display: block; margin-bottom: 5px;">1. Selecione a ÁREA (Polígono):</label>
+							<select id="select-intersect-poly" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #0f435e; background: white; font-size: 13px; margin-bottom: 15px;">
+								${polyOptionsHtml}
+							</select>
+						</div>
+
+						<div>
+							<label style="font-size: 13px; font-weight: bold; color: #0f435e; display: block; margin-bottom: 5px;">2. Selecione os PONTOS:</label>
+							<select id="select-intersect-point" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #0f435e; background: white; font-size: 13px; margin-bottom: 25px;">
+								${pointOptionsHtml}
+							</select>
+						</div>
+
+						<div style="display: flex; justify-content: space-between;">
+							<button onclick="executarProcessamentoIntersecao()" style="background: #2ecc71; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 48%;">Calcular SIG</button>
+							<button onclick="fecharModalIntersecao()" style="background: #ccc; color: #333; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 48%;">Cancelar</button>
+						</div>
+					</div>
+				</div>
+			`;
+
+			document.body.insertAdjacentHTML('beforeend', modalHtml);
+		}
+
+		function executarProcessamentoIntersecao() {
+			var polyChoice = document.getElementById('select-intersect-poly').value;
+			var pointChoice = document.getElementById('select-intersect-point').value;
+			fecharModalIntersecao();
+
+			// Mapeamento completo e seguro dos objetos JSON globais
+			var polygonsMap = {
+				"1": typeof json_Districts_36 !== 'undefined' ? json_Districts_36 : null,
+				"2": typeof json_AdministrativePosts_37 !== 'undefined' ? json_AdministrativePosts_37 : null,
+				"3": typeof json_ConservationAreas_33 !== 'undefined' ? json_ConservationAreas_33 : null,
+				"4": typeof json_Wetlands_30 !== 'undefined' ? json_Wetlands_30 : null,
+				"5": typeof json_KeyBiodiversityAreas_34 !== 'undefined' ? json_KeyBiodiversityAreas_34 : null,
+				"6": typeof json_AreasofKeyEvolutionaryProcesses_32 !== 'undefined' ? json_AreasofKeyEvolutionaryProcesses_32 : null,
+				"7": typeof json_MiningConcessions2011_40 !== 'undefined' ? json_MiningConcessions2011_40 : null,
+				"8": typeof json_MiningConcessions2018_41 !== 'undefined' ? json_MiningConcessions2018_41 : null,
+				"9": typeof json_Localities_38 !== 'undefined' ? json_Localities_38 : null
+			};
+			
+			var pointsMap = {
+				"1": typeof json_Schools_52 !== 'undefined' ? json_Schools_52 : null,
+				"2": typeof json_HealthFacilities_53 !== 'undefined' ? json_HealthFacilities_53 : null,
+				"3": typeof json_CitiesandVillages_43 !== 'undefined' ? json_CitiesandVillages_43 : null,
+				"4": typeof json_MajorCities_50 !== 'undefined' ? json_MajorCities_50 : null,
+				"5": typeof json_PopulatedPlaces_45 !== 'undefined' ? json_PopulatedPlaces_45 : null,
+				"6": typeof json_Fishingcenters_51 !== 'undefined' ? json_Fishingcenters_51 : null,
+				"7": typeof json_CBA_SCALE_Communities_46 !== 'undefined' ? json_CBA_SCALE_Communities_46 : null
+			};
+
+			var polyData = polygonsMap[polyChoice];
+			var pointData = pointsMap[pointChoice];
+
+			if (!polyData || !pointData) {
+				exibirMensagemResultado("Aviso", "Erro: Não foi possível encontrar os dados de uma das camadas selecionadas.", "#e74c3c");
+				return;
+			}
+
+			try {
+				// Execução do cálculo espacial via Turf.js
+				var ptsWithin = turf.pointsWithinPolygon(pointData, polyData);
+
+				if (ptsWithin.features.length > 0) {
+					// Criação e disparo do download do GeoJSON gerado
+					var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(ptsWithin));
+					var dl = document.createElement('a');
+					dl.setAttribute("href", dataStr);
+					dl.setAttribute("download", "resultado_intersecao_camada_" + pointChoice + ".geojson");
+					document.body.appendChild(dl);
+					dl.click();
+					dl.remove();
+
+					exibirMensagemResultado("Sucesso!", `Foram encontrados <b>${ptsWithin.features.length}</b> pontos dentro da área selecionada.<br><br><i>O download do ficheiro GeoJSON foi iniciado automaticamente.</i>`, "#2ecc71");
+				} else {
+					exibirMensagemResultado("Análise Concluída", "Nenhum ponto encontrado dentro do limite da área selecionada.", "#0f435e");
+				}
+			} catch (err) {
+				console.error(err);
+				exibirMensagemResultado("Erro", "Ocorreu um erro ao processar a interseção: " + err.message, "#e74c3c");
+			}
+		}
+
+		// Auxiliar para substituir os antigos 'alerts' de resultado por caixas elegantes
+		function exibirMensagemResultado(titulo, mensagem, corDestaque) {
+			fecharModalIntersecao();
+			var resultadoHtml = `
+				<div id="modal-intersect-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100005; display: flex; align-items: center; justify-content: center; font-family: 'Arial', sans-serif;">
+					<div style="background: #ebf3f1; padding: 20px; border-radius: 8px; width: 300px; text-align: center; box-shadow: 0 4px 15 rgba(0,0,0,0.3); border: 2px solid ${corDestaque};">
+						<h4 style="margin-top: 0; color: ${corDestaque}; font-size: 16px;">${titulo}</h4>
+						<p style="font-size: 13px; color: #333; line-height: 1.4; margin-bottom: 15px;">${mensagem}</p>
+						<button onclick="fecharModalIntersecao()" style="background: ${corDestaque}; color: white; border: none; padding: 8px 25px; border-radius: 4px; cursor: pointer; font-weight: bold;">Fechar</button>
+					</div>
+				</div>
+			`;
+			document.body.insertAdjacentHTML('beforeend', resultadoHtml);
+		}
+		
+		
 		// --- CONFIGURAÇÃO DO DESENHO UNIVERSAL (PONTOS, LINHAS E POLÍGONOS) ---
         var drawnItems = new L.FeatureGroup();
         map.addLayer(drawnItems); 
@@ -4109,76 +4292,148 @@
 					L.DomEvent.stopPropagation(e);
 					L.DomEvent.preventDefault(e);
 					
-					var choice = prompt("O que deseja encontrar mais próximo?\n1. Escolas\n2. Saúde\n3. Cidades/Vilas\n4. Grandes Cidades/Vilas\n5. Locais Povoados\n6. Centros de Pesca\n7. Comunidades do projecro CBA SCALE+");
-					
-					if (choice) {
-						// Indica visualmente que o mapa está em modo de seleção
-						map.getContainer().style.cursor = 'crosshair';
-						alert("Clique em qualquer ponto do mapa (mesmo sobre áreas coloridas) para calcular a distância.");
-
-						// Função interna que será executada ao clicar
-						var onCustomClick = function(ev) {
-							// Impede que o clique dispare outros eventos de camadas abaixo
-							ev.stopPropagation();
-
-							// Traduz o clique no ecrã para coordenadas geográficas
-							var latlng = map.mouseEventToLatLng(ev);
-							var clickPoint = turf.point([latlng.lng, latlng.lat]);
-
-							// Remove o "ouvinte" e volta o cursor ao normal
-							map.getContainer().removeEventListener('click', onCustomClick, true);
-							map.getContainer().style.cursor = '';
-
-							var layers = {
-								"1": typeof json_Schools_52 !== 'undefined' ? json_Schools_52 : null,
-								"2": typeof json_HealthFacilities_53 !== 'undefined' ? json_HealthFacilities_53 : null,
-								"3": typeof json_CitiesandVillages_43 !== 'undefined' ? json_CitiesandVillages_43 : null,
-								"4": typeof json_MajorCities_50 !== 'undefined' ? json_MajorCities_50 : null,
-								"5": typeof json_PopulatedPlaces_45 !== 'undefined' ? json_PopulatedPlaces_45 : null,
-								"6": typeof json_Fishingcenters_51 !== 'undefined' ? json_Fishingcenters_51 : null,
-								"7": typeof json_CBA_SCALE_Communities_46 !== 'undefined' ? json_CBA_SCALE_Communities_46 : null
-								
-							};
-
-							var targetData = layers[choice];
-
-							if (targetData) {
-								var nearest = turf.nearestPoint(clickPoint, targetData);
-								var distance = turf.distance(clickPoint, nearest, {units: 'kilometers'}).toFixed(2);
-								
-								var p1 = [latlng.lat, latlng.lng];
-								var p2 = [nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]];
-								
-								// Desenha a linha laranja pontilhada
-								var line = L.polyline([p1, p2], {
-									color: '#e67e22', 
-									weight: 5, 
-									dashArray: '10, 10',
-									opacity: 0.9
-								}).addTo(map);
-								
-								L.popup()
-									.setLatLng(p2)
-									.setContent("<b>LOCAL PRÓXIMO</b><br>Infraestrutura/Local encontrada(o)!<br>Distância: <b>" + distance + " km</b>")
-									.openOn(map);
-
-								// Limpa a linha após 10 segundos
-								setTimeout(function() { map.removeLayer(line); }, 10000);
-							} else {
-								alert("Dados não carregados ou camada inexistente.");
-							}
-						};
-
-						// O segredo: 'true' no final ativa a fase de captura, 
-						// fazendo com que este clique seja lido ANTES de qualquer polígono.
-						map.getContainer().addEventListener('click', onCustomClick, true);
-					}
+					// Abre o novo menu flutuante estilizado para proximidade
+					abrirMenuProximidade(map);
 				};
 				return container;
 			}
 		});
 
 		map.addControl(new NearestControl());
+
+		// --- FUNÇÕES DE INTERFACE PARA A FERRAMENTA DE PROXIMIDADE ---
+
+		function fecharModalProximidade() {
+			var modal = document.getElementById('modal-proximidade-container');
+			if (modal) { modal.remove(); }
+		}
+
+		function abrirMenuProximidade(map) {
+			fecharModalProximidade();
+
+			// Lista de opções da ferramenta de proximidade
+			var opcoesProximidade = [
+				{ id: "1", label: "Escolas" },
+				{ id: "2", label: "Saúde" },
+				{ id: "3", label: "Cidades/Vilas" },
+				{ id: "4", label: "Grandes Cidades/Vilas" },
+				{ id: "5", label: "Locais Povoados" },
+				{ id: "6", label: "Centros de Pesca" },
+				{ id: "7", label: "Comunidades do projecto CBA SCALE+" }
+			];
+
+			var optionsHtml = "";
+			opcoesProximidade.forEach(item => {
+				optionsHtml += `<option value="${item.id}">${item.id}. ${item.label}</option>`;
+			});
+
+			var modalHtml = `
+				<div id="modal-proximidade-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100005; display: flex; align-items: center; justify-content: center; font-family: 'Arial', sans-serif;">
+					<div style="background: #ebf3f1; padding: 20px; border-radius: 8px; width: 340px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f435e;">
+						<h3 style="margin-top: 0; color: #0f435e; text-align: center; border-bottom: 2px solid #ccc; padding-bottom: 8px;">Análise de Proximidade</h3>
+						<p style="font-size: 13px; color: #333; margin-bottom: 12px; text-align: center;">O que deseja encontrar mais próximo a partir do clique?</p>
+						
+						<select id="select-proximidade-alvo" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #0f435e; background: white; font-size: 14px; margin-bottom: 20px;">
+							${optionsHtml}
+						</select>
+
+						<div style="display: flex; justify-content: space-between;">
+							<button onclick="prepararCliqueProximidade(map)" style="background: #0f435e; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 48%;">Avançar</button>
+							<button onclick="fecharModalProximidade()" style="background: #ccc; color: #333; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 48%;">Cancelar</button>
+						</div>
+					</div>
+				</div>
+			`;
+			
+			document.body.insertAdjacentHTML('beforeend', modalHtml);
+			
+			// Torna a variável 'map' acessível internamente na execução global temporária do botão
+			window.currentMapInstance = map;
+		}
+
+		function prepararCliqueProximidade() {
+			var map = window.currentMapInstance;
+			var choice = document.getElementById('select-proximidade-alvo').value;
+			fecharModalProximidade();
+
+			if (!choice || !map) return;
+
+			// Mostra o aviso estilizado na tela instruindo o usuário sobre o clique
+			var avisoHtml = `
+				<div id="modal-proximidade-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 100005; display: flex; align-items: center; justify-content: center; font-family: 'Arial', sans-serif;">
+					<div style="background: #ebf3f1; padding: 20px; border-radius: 8px; width: 280px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3); border: 2px solid #e67e22;">
+						<h4 style="margin-top: 0; color: #e67e22; font-size: 16px;">Modo de Seleção Ativo</h4>
+						<p style="font-size: 13px; color: #333; line-height: 1.4;">Clique em qualquer ponto do mapa (mesmo sobre áreas coloridas) para calcular a distância.</p>
+						<button onclick="fecharModalProximidade()" style="background: #e67e22; color: white; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 5px;">Entendido</button>
+					</div>
+				</div>
+			`;
+			document.body.insertAdjacentHTML('beforeend', avisoHtml);
+
+			// Altera o cursor do mouse para indicar o modo de seleção cruzada
+			map.getContainer().style.cursor = 'crosshair';
+
+			// Cria a função de escuta do clique no mapa
+			var onCustomClick = function(ev) {
+				ev.stopPropagation();
+
+				// Fecha o aviso flutuante se ele ainda estiver na tela
+				fecharModalProximidade();
+
+				var latlng = map.mouseEventToLatLng(ev);
+				var clickPoint = turf.point([latlng.lng, latlng.lat]);
+
+				// Remove o ouvinte e reverte o cursor
+				map.getContainer().removeEventListener('click', onCustomClick, true);
+				map.getContainer().style.cursor = '';
+
+				var layers = {
+					"1": typeof json_Schools_52 !== 'undefined' ? json_Schools_52 : null,
+					"2": typeof json_HealthFacilities_53 !== 'undefined' ? json_HealthFacilities_53 : null,
+					"3": typeof json_CitiesandVillages_43 !== 'undefined' ? json_CitiesandVillages_43 : null,
+					"4": typeof json_MajorCities_50 !== 'undefined' ? json_MajorCities_50 : null,
+					"5": typeof json_PopulatedPlaces_45 !== 'undefined' ? json_PopulatedPlaces_45 : null,
+					"6": typeof json_Fishingcenters_51 !== 'undefined' ? json_Fishingcenters_51 : null,
+					"7": typeof json_CBA_SCALE_Communities_46 !== 'undefined' ? json_CBA_SCALE_Communities_46 : null
+				};
+
+				var targetData = layers[choice];
+
+				if (targetData) {
+					try {
+						var nearest = turf.nearestPoint(clickPoint, targetData);
+						var distance = turf.distance(clickPoint, nearest, {units: 'kilometers'}).toFixed(2);
+						
+						var p1 = [latlng.lat, latlng.lng];
+						var p2 = [nearest.geometry.coordinates[1], nearest.geometry.coordinates[0]];
+						
+						// Desenha a linha pontilhada laranja
+						var line = L.polyline([p1, p2], {
+							color: '#e67e22', 
+							weight: 5, 
+							dashArray: '10, 10',
+							opacity: 0.9
+						}).addTo(map);
+						
+						L.popup()
+							.setLatLng(p2)
+							.setContent("<b>LOCAL PRÓXIMO</b><br>Infraestrutura/Local encontrada(o)!<br>Distância: <b>" + distance + " km</b>")
+							.openOn(map);
+
+						// Remove a linha após 10 segundos
+						setTimeout(function() { map.removeLayer(line); }, 10000);
+					} catch (err) {
+						console.error(err);
+						alert("Erro ao processar proximidade espacial: " + err.message);
+					}
+				} else {
+					alert("Dados não carregados ou camada inexistente.");
+				}
+			};
+
+			// Ativa a fase de captura do clique (antecipa cliques sobre polígonos complexos)
+			map.getContainer().addEventListener('click', onCustomClick, true);
+		}
 		
 		//////////////////////////////////////
 		// MAPEAR LAYERS → LEGENDAS
