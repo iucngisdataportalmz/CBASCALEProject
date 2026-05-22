@@ -3690,7 +3690,7 @@
 			var modalHtml = `
 				<div id="modal-export-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100005; display: flex; align-items: center; justify-content: center; font-family: 'Arial', sans-serif;">
 					<div style="background: #ebf3f1; padding: 25px; border-radius: 8px; width: 360px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f435e;">
-						<h3 style="margin-top: 0; color: #0f435e; text-align: center; border-bottom: 2px solid #ccc; padding-bottom: 8px;">Exportar Camada Ativa</h3>
+						<h3 style="margin-top: 0; color: #0f435e; text-align: center; border-bottom: 2px solid #ccc; padding-bottom: 8px;">Exportar Camada Activa</h3>
 						<p style="font-size: 13px; color: #333; margin-bottom: 12px; text-align: center;">Selecione uma das camadas visíveis no mapa para descarregar em formato GeoJSON:</p>
 						
 						<select id="select-export-layer" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #0f435e; background: white; font-size: 13px; margin-bottom: 25px; max-height: 150px;">
@@ -4718,7 +4718,7 @@
 				return;
 			}
 			
-			// Percorre todas as camadas ativas no mapa
+			// Percorre todas as camadas activas no mapa
 			map.eachLayer(function(layer) {
 				// Verifica se a camada tem dados (feature) e se pertence aos Distritos
 				// O qgis2web geralmente usa ADM2_PT ou NM_DIST para distritos em Moçambique
