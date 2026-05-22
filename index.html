@@ -3774,210 +3774,312 @@
         });
         map.addControl(drawControl);
 		
+		// Variável de controle global do elemento desenhado atual
+		var camadaDesenhadaAtual = null;
+
 		map.on(L.Draw.Event.CREATED, function (event) {
 			var layer = event.layer;
 			drawnItems.addLayer(layer); 
+			camadaDesenhadaAtual = layer; // Guarda a referência global para o processamento
 
-			// Função interna para processar o Clip (separada para ser reutilizada no Buffer)
-			function processarClip(geometriaParaClip) {
-				var userPolygon = geometriaParaClip.toGeoJSON();
+			// Cria ou exibe o menu de opções (Clip, Buffer, Apagar)
+			criarMenuAcoesContexto();
+		});
+
+		// --- NOVO COMPONENTE: GERENCIADOR DE MENUS POPUP ---
+		function criarMenuAcoesContexto() {
+			// Remove se já existir algum aberto
+			fecharMenuFlutuante();
+
+			var menuHtml = `
+				<div id="modal-gis-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100005; display: flex; align-items: center; justify-content: center; font-family: 'Arial', sans-serif;">
+					<div style="background: #ebf3f1; padding: 20px; border-radius: 8px; width: 320px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f435e;">
+						<h3 style="margin-top: 0; color: #0f435e; text-align: center; border-bottom: 2px solid #ccc; padding-bottom: 8px;">Operação GIS</h3>
+						<p style="font-size: 14px; color: #333; text-align: center;">O que deseja fazer com a geometria desenhada?</p>
+						<div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+							<button onclick="abrirMenuSelecaoCamadas()" style="background: #0f435e; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold;">1. Clip (Recorte)</button>
+							<button onclick="solicitarRaioBuffer()" style="background: #0f435e; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold;">2. Gerar Buffer</button>
+							<button onclick="apagarCamadaDesenhada()" style="background: #e74c3c; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold;">3. Apagar Desenho</button>
+							<button onclick="fecharMenuFlutuante()" style="background: #ccc; color: #333; border: none; padding: 8px; border-radius: 4px; cursor: pointer; margin-top: 5px;">Cancelar</button>
+						</div>
+					</div>
+				</div>
+			`;
+			document.body.insertAdjacentHTML('beforeend', menuHtml);
+		}
+
+		function solicitarRaioBuffer() {
+			fecharMenuFlutuante();
+			
+			var bufferHtml = `
+				<div id="modal-gis-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100005; display: flex; align-items: center; justify-content: center; font-family: 'Arial', sans-serif;">
+					<div style="background: #ebf3f1; padding: 20px; border-radius: 8px; width: 300px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f435e; text-align: center;">
+						<h3 style="margin-top: 0; color: #0f435e;">Definir Raio</h3>
+						<label style="font-size: 13px; display: block; margin-bottom: 8px;">Raio de Proximidade (metros):</label>
+						<input type="number" id="input-raio-buffer" value="500" style="width: 80%; padding: 6px; border-radius: 4px; border: 1px solid #ccc; text-align: center; margin-bottom: 15px;" />
+						<div style="display: flex; justify-content: space-around;">
+							<button onclick="executarGeracaoBuffer()" style="background: #2ecc71; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">Gerar</button>
+							<button onclick="criarMenuAcoesContexto()" style="background: #ccc; color: #333; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">Voltar</button>
+						</div>
+					</div>
+				</div>
+			`;
+			document.body.insertAdjacentHTML('beforeend', bufferHtml);
+		}
+
+		function executarGeracaoBuffer() {
+			var raio = document.getElementById('input-raio-buffer').value;
+			fecharMenuFlutuante();
+
+			if (raio && camadaDesenhadaAtual) {
+				var distKm = parseFloat(raio) / 1000;
+				var bufferGeo = turf.buffer(camadaDesenhadaAtual.toGeoJSON(), distKm, {units: 'kilometers'});
+				var bufferLayer = L.geoJSON(bufferGeo, {
+					style: { color: '#ff5722', fillOpacity: 0.2 }
+				}).addTo(drawnItems);
 				
-				// Se for uma FeatureCollection (comum no Turf Buffer), pega a primeira feature
-				if (userPolygon.type === 'FeatureCollection') {
-					userPolygon = userPolygon.features[0];
-				}
+				camadaDesenhadaAtual = bufferLayer; // Atualiza a referência global para o buffer caso queira recortar
 
-				var choice = prompt("Escolha a camada para processar:\n1. Escolas\n2. Rios\n3. Estradas Principais\n4. Estradas Secundárias\n5. Distritos\n6. Áreas de Conservação\n7. Postos Administrativos\n8. Cidades e Vilas\n9. Locais Povoados\n10. Áreas Chaves Evolutivas\n11. Edifícios\n12. Áreas desmatadas 2017-23\n13. Ecoregions\n14. Importância Ecossistemas\n15. Centros de Pesca\n16. Geologia\n17. Saúde\n18. Áreas Biodiversidade\n19. Precipitação\n20. Concessões 2011\n21. Concessões 2018\n22. Solos\n23. Águas Subterâneas\n24. Áreas Húmidas\n25. Localidades\n26. Comunidades do Projecto CBA SCALE+");
+				// Pergunta customizada em modal se deseja recortar
+				var confirmarClipHtml = `
+					<div id="modal-gis-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100005; display: flex; align-items: center; justify-content: center; font-family: 'Arial', sans-serif;">
+						<div style="background: #ebf3f1; padding: 20px; border-radius: 8px; width: 300px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #2ecc71; text-align: center;">
+							<h3 style="margin-top: 0; color: #2ecc71;">Buffer Concluído!</h3>
+							<p style="font-size: 14px;">Deseja fazer o Clip (Recorte) utilizando esta nova área amortecedora?</p>
+							<div style="display: flex; justify-content: space-around; margin-top: 15px;">
+								<button onclick="abrirMenuSelecaoCamadas()" style="background: #2ecc71; color: white; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">Sim</button>
+								<button onclick="fecharMenuFlutuante()" style="background: #ccc; color: #333; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer;">Não</button>
+							</div>
+						</div>
+					</div>
+				`;
+				document.body.insertAdjacentHTML('beforeend', confirmarClipHtml);
+			}
+		}
 
-				if (!choice) return;
+		function apagarCamadaDesenhada() {
+			if (camadaDesenhadaAtual) {
+				drawnItems.removeLayer(camadaDesenhadaAtual);
+			}
+			fecharMenuFlutuante();
+		}
 
-				// --- DICIONÁRIO DE CONFIGURAÇÃO (Mantido) ---
-				var statsConfig = {
-					"1":  { coluna: 'Classifica', operacao: 'count', grafico: 'bar', titulo: 'Escolas por Nível' },
-					"2":  { coluna: 'TIPO_RIO', operacao: 'count', grafico: 'pie', titulo: 'Nº de Rios' },
-					"3": { coluna: 'TPO_COM', operacao: 'count', grafico: 'pie', titulo: 'Estradas Primárias' },
-					"4": { coluna: 'TPO_COM', operacao: 'count', grafico: 'pie', titulo: 'Estradas Secundárias' },
-					"5": { coluna: 'DISTRITO', operacao: 'count', grafico: 'bar', titulo: 'Distritos' },
-					"6": { coluna: 'Name', operacao: 'count', grafico: 'bar', titulo: 'Áreas de Conservação' },
-					"7": { coluna: 'ADM2_PT', operacao: 'count', grafico: 'bar', titulo: 'Postos Administrativos' },
-					"8": { coluna: 'TIPO_TOP', operacao: 'count', grafico: 'bar', titulo: 'Cidades e Vilas' },
-					"9": { coluna: 'place', operacao: 'count', grafico: 'pie', titulo: 'Locais Habitados' },
-					"10": { coluna: 'Name', operacao: 'count', grafico: 'bar', titulo: 'Processos Evolutivos' },
-					"11": { coluna: 'building', operacao: 'count', grafico: 'bar', titulo: 'Edifícios' },
-					"12": { coluna: 'layer', operacao: 'sum', colValor: 'Area_ha', grafico: 'doughnut', titulo: 'Desmatamento (Ha)' },
-					"13": { coluna: 'ECO_NAME', operacao: 'count', grafico: 'bar', titulo: 'Ecoregiões' },
-					"15": { coluna: 'CENTROS_PE', operacao: 'count', grafico: 'bar', titulo: 'Centros de Pesca' },
-					"16": { coluna: 'CLASSE', operacao: 'count', grafico: 'bar', titulo: 'Geologia' },
-					"17": { coluna: 'TIPO', operacao: 'count', grafico: 'bar', titulo: 'Saúde' },
-					"18": { coluna: 'KBA_Name', operacao: 'count', grafico: 'bar', titulo: 'KBAs' },
-					"19": { coluna: 'Classe', operacao: 'count', grafico: 'bar', titulo: 'Precipitação' },
-					"20": { coluna: 'LicenseSuf', operacao: 'count', grafico: 'pie', titulo: 'Concessões 2011' },
-					"21": { coluna: 'Tipo', operacao: 'count', grafico: 'pie', titulo: 'Concessões 2018' },
-					"22": { coluna: 'DOMSOI', operacao: 'count', grafico: 'bar', titulo: 'Tipos de Solos' },
-					"23": { coluna: 'CAPTA', operacao: 'count', grafico: 'pie', titulo: 'Fontes de Água' },
-					"24": { coluna: 'Area_hecta', operacao: 'count', grafico: 'bar', titulo: 'Áreas Húmidas' },
-					"25": { coluna: 'Localidade', operacao: 'sum', colValor: 'TOTAL', grafico: 'doughnut', titulo: 'População por Localidade' },
-					"26": { coluna: 'Distrito_', operacao: 'count', grafico: 'bar', titulo: 'Comunidades do Projecto CBA SCALE+ por Distrito' }
-				};
+		function fecharMenuFlutuante() {
+			var modalExistente = document.getElementById('modal-gis-container');
+			if (modalExistente) { modalExistente.remove(); }
+		}
 
-				var dataMap = {
-					"1": typeof json_Schools_52 !== 'undefined' ? json_Schools_52 : null,
-					"2": typeof json_River_41 !== 'undefined' ? json_River_41 : null,
-					"3": typeof json_MainRoads_48 !== 'undefined' ? json_MainRoads_48 : null,
-					"4": typeof json_SecondaryRoads_49 !== 'undefined' ? json_SecondaryRoads_49 : null,
-					"5": typeof json_Districts_36 !== 'undefined' ? json_Districts_36 : null,
-					"6": typeof json_ConservationAreas_33 !== 'undefined' ? json_ConservationAreas_33 : null,
-					"7": typeof json_AdministrativePosts_37 !== 'undefined' ? json_AdministrativePosts_37 : null,
-					"8": typeof json_CitiesandVillages_43 !== 'undefined' ? json_CitiesandVillages_43 : null,
-					"9": typeof json_PopulatedPlaces_45 !== 'undefined' ? json_PopulatedPlaces_45 : null,
-					"10": typeof json_AreasofKeyEvolutionaryProcesses_32 !== 'undefined' ? json_AreasofKeyEvolutionaryProcesses_32 : null,
-					"11": typeof json_buildings_47 !== 'undefined' ? json_buildings_47 : null,
-					"12": typeof json_Deforestation_2017_2023_35 !== 'undefined' ? json_Deforestation_2017_2023_35 : null,
-					"13": typeof json_Ecoregions_31 !== 'undefined' ? json_Ecoregions_31 : null,
-					"15": typeof json_Fishingcenters_51 !== 'undefined' ? json_Fishingcenters_51 : null,
-					"16": typeof json_Geology_28 !== 'undefined' ? json_Geology_28 : null,
-					"17": typeof json_HealthFacilities_53 !== 'undefined' ? json_HealthFacilities_53 : null,
-					"18": typeof json_KeyBiodiversityAreas_34 !== 'undefined' ? json_KeyBiodiversityAreas_34 : null,
-					"19": typeof json_MeanPrecipitation_25 !== 'undefined' ? json_MeanPrecipitation_25 : null,
-					"20": typeof json_MiningConcessions2011_40 !== 'undefined' ? json_MiningConcessions2011_40 : null,
-					"21": typeof json_MiningConcessions2018_41 !== 'undefined' ? json_MiningConcessions2018_41 : null,
-					"22": typeof json_Soil_29 !== 'undefined' ? json_Soil_29 : null,
-					"23": typeof json_UpperGroundwaterAquifers_39 !== 'undefined' ? json_UpperGroundwaterAquifers_39 : null,
-					"24": typeof json_Wetlands_30 !== 'undefined' ? json_Wetlands_30 : null,
-					"25": typeof json_Localities_38 !== 'undefined' ? json_Localities_38 : null,
-					"26": typeof json_CBA_SCALE_Communities_46 !== 'undefined' ? json_CBA_SCALE_Communities_46 : null
-				};
+		// --- SOLUÇÃO PARA A ROLAGEM / SCROLL DA LISTA COMPRIDA ---
+		function abrirMenuSelecaoCamadas() {
+			fecharMenuFlutuante();
 
-				var targetData = dataMap[choice];
-				if (!targetData) { alert("Dados não carregados para esta camada."); return; }
+			// Lista mapeada com as suas 26 opções estruturadas de forma limpa
+			var listaOpcoes = [
+				{ id: "1", label: "Escolas" }, { id: "2", label: "Rios" }, { id: "3", label: "Estradas Principais" },
+				{ id: "4", label: "Estradas Secundárias" }, { id: "5", label: "Distritos" }, { id: "6", label: "Áreas de Conservação" },
+				{ id: "7", label: "Postos Administrativos" }, { id: "8", label: "Cidades e Vilas" }, { id: "9", label: "Locais Povoados" },
+				{ id: "10", label: "Áreas Chaves Evolutivas" }, { id: "11", label: "Edifícios" }, { id: "12", label: "Áreas desmatadas 2017-23" },
+				{ id: "13", label: "Ecoregions" }, { id: "14", label: "Importância Ecossistemas" }, { id: "15", label: "Centros de Pesca" },
+				{ id: "16", label: "Geologia" }, { id: "17", label: "Saúde" }, { id: "18", label: "Áreas Biodiversidade" },
+				{ id: "19", label: "Precipitação" }, { id: "20", label: "Concessões 2011" }, { id: "21", label: "Concessões 2018" },
+				{ id: "22", label: "Solos" }, { id: "23", label: "Águas Subterâneas" }, { id: "24", label: "Áreas Húmidas" },
+				{ id: "25", label: "Localidades" }, { id: "26", label: "Comunidades do Projecto CBA SCALE+" }
+			];
 
-				try {
-					var clippedFeatures = [];
-					var stats = {};
-					var currentConfig = statsConfig[choice];
+			var optionsHtml = "";
+			listaOpcoes.forEach(item => {
+				optionsHtml += `<option value="${item.id}">${item.id}. ${item.label}</option>`;
+			});
 
-					targetData.features.forEach(function(f) {
-						var intersected = null;
-						// Verificação rigorosa com Turf
-						if (f.geometry.type === 'Point' || f.geometry.type === 'MultiPoint') {
-							if (turf.booleanPointInPolygon(f, userPolygon)) { intersected = f; }
+			var camadaModalHtml = `
+				<div id="modal-gis-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100005; display: flex; align-items: center; justify-content: center; font-family: 'Arial', sans-serif;">
+					<div style="background: #ebf3f1; padding: 20px; border-radius: 8px; width: 350px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f435e;">
+						<h3 style="margin-top: 0; color: #0f435e; text-align: center;">Selecionar Camada Alvo</h3>
+						<p style="font-size: 13px; color: #555; margin-bottom: 10px;">Escolha a camada estruturada da qual deseja extrair as estatísticas:</p>
+						
+						<select id="select-camada-alvo" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #0f435e; background: white; font-size: 14px; max-height: 200px;">
+							${optionsHtml}
+						</select>
+
+						<div style="display: flex; justify-content: space-between; margin-top: 20px;">
+							<button onclick="dispararProcessamentoClip()" style="background: #2ecc71; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 48%;">Processar</button>
+							<button onclick="criarMenuAcoesContexto()" style="background: #ccc; color: #333; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; width: 48%;">Voltar</button>
+						</div>
+					</div>
+				</div>
+			`;
+			document.body.insertAdjacentHTML('beforeend', camadaModalHtml);
+		}
+
+		function dispararProcessamentoClip() {
+			var escolha = document.getElementById('select-camada-alvo').value;
+			fecharMenuFlutuante();
+
+			if (escolha && camadaDesenhadaAtual) {
+				processarClipOriginal(camadaDesenhadaAtual, escolha);
+			}
+		}
+
+		// --- CORE DO PROCESSO DE CLIP REESTRUTURADO ---
+		function processarClipOriginal(geometriaParaClip, choice) {
+			var userPolygon = geometriaParaClip.toGeoJSON();
+			
+			if (userPolygon.type === 'FeatureCollection') {
+				userPolygon = userPolygon.features[0];
+			}
+
+			var statsConfig = {
+				"1":  { coluna: 'Classifica', operacao: 'count', grafico: 'bar', titulo: 'Escolas por Nível' },
+				"2":  { coluna: 'TIPO_RIO', operacao: 'count', grafico: 'pie', titulo: 'Nº de Rios' },
+				"3":  { coluna: 'TPO_COM', operacao: 'count', grafico: 'pie', titulo: 'Estradas Primárias' },
+				"4":  { coluna: 'TPO_COM', operacao: 'count', grafico: 'pie', titulo: 'Estradas Secundárias' },
+				"5":  { coluna: 'DISTRITO', operacao: 'count', grafico: 'bar', titulo: 'Distritos' },
+				"6":  { coluna: 'Name', operacao: 'count', grafico: 'bar', titulo: 'Áreas de Conservação' },
+				"7":  { coluna: 'ADM2_PT', operacao: 'count', grafico: 'bar', titulo: 'Postos Administrativos' },
+				"8":  { coluna: 'TIPO_TOP', operacao: 'count', grafico: 'bar', titulo: 'Cidades e Vilas' },
+				"9":  { coluna: 'place', operacao: 'count', grafico: 'pie', titulo: 'Locais Habitados' },
+				"10": { coluna: 'Name', operacao: 'count', grafico: 'bar', titulo: 'Processos Evolutivos' },
+				"11": { coluna: 'building', operacao: 'count', grafico: 'bar', titulo: 'Edifícios' },
+				"12": { coluna: 'layer', operacao: 'sum', colValor: 'Area_ha', grafico: 'doughnut', titulo: 'Desmatamento (Ha)' },
+				"13": { coluna: 'ECO_NAME', operacao: 'count', grafico: 'bar', titulo: 'Ecoregiões' },
+				"15": { coluna: 'CENTROS_PE', operacao: 'count', grafico: 'bar', titulo: 'Centros de Pesca' },
+				"16": { coluna: 'CLASSE', operacao: 'count', grafico: 'bar', titulo: 'Geologia' },
+				"17": { coluna: 'TIPO', operacao: 'count', grafico: 'bar', titulo: 'Saúde' },
+				"18": { coluna: 'KBA_Name', operacao: 'count', grafico: 'bar', titulo: 'KBAs' },
+				"19": { coluna: 'Classe', operacao: 'count', grafico: 'bar', titulo: 'Precipitação' },
+				"20": { coluna: 'LicenseSuf', operacao: 'count', grafico: 'pie', titulo: 'Concessões 2011' },
+				"21": { coluna: 'Tipo', operacao: 'count', grafico: 'pie', titulo: 'Concessões 2018' },
+				"22": { coluna: 'DOMSOI', operacao: 'count', grafico: 'bar', titulo: 'Tipos de Solos' },
+				"23": { coluna: 'CAPTA', operacao: 'count', grafico: 'pie', titulo: 'Fontes de Água' },
+				"24": { coluna: 'Area_hecta', operacao: 'count', grafico: 'bar', titulo: 'Áreas Húmidas' },
+				"25": { coluna: 'Localidade', operacao: 'sum', colValor: 'TOTAL', grafico: 'doughnut', titulo: 'População por Localidade' },
+				"26": { coluna: 'Distrito_', operacao: 'count', grafico: 'bar', titulo: 'Comunidades do Projecto CBA SCALE+ por Distrito' }
+			};
+
+			var dataMap = {
+				"1": typeof json_Schools_52 !== 'undefined' ? json_Schools_52 : null,
+				"2": typeof json_River_42 !== 'undefined' ? json_River_42 : null, // Corrigido ID sequencial caso necessário baseado no seu código anterior
+				"3": typeof json_MainRoads_48 !== 'undefined' ? json_MainRoads_48 : null,
+				"4": typeof json_SecondaryRoads_49 !== 'undefined' ? json_SecondaryRoads_49 : null,
+				"5": typeof json_Districts_36 !== 'undefined' ? json_Districts_36 : null,
+				"6": typeof json_ConservationAreas_33 !== 'undefined' ? json_ConservationAreas_33 : null,
+				"7": typeof json_AdministrativePosts_37 !== 'undefined' ? json_AdministrativePosts_37 : null,
+				"8": typeof json_CitiesandVillages_43 !== 'undefined' ? json_CitiesandVillages_43 : null,
+				"9": typeof json_PopulatedPlaces_45 !== 'undefined' ? json_PopulatedPlaces_45 : null,
+				"10": typeof json_AreasofKeyEvolutionaryProcesses_32 !== 'undefined' ? json_AreasofKeyEvolutionaryProcesses_32 : null,
+				"11": typeof json_buildings_47 !== 'undefined' ? json_buildings_47 : null,
+				"12": typeof json_Deforestation_2017_2023_35 !== 'undefined' ? json_Deforestation_2017_2023_35 : null,
+				"13": typeof json_Ecoregions_31 !== 'undefined' ? json_Ecoregions_31 : null,
+				"15": typeof json_Fishingcenters_51 !== 'undefined' ? json_Fishingcenters_51 : null,
+				"16": typeof json_Geology_28 !== 'undefined' ? json_Geology_28 : null,
+				"17": typeof json_HealthFacilities_53 !== 'undefined' ? json_HealthFacilities_53 : null,
+				"18": typeof json_KeyBiodiversityAreas_34 !== 'undefined' ? json_KeyBiodiversityAreas_34 : null,
+				"19": typeof json_MeanPrecipitation_25 !== 'undefined' ? json_MeanPrecipitation_25 : null,
+				"20": typeof json_MiningConcessions2011_40 !== 'undefined' ? json_MiningConcessions2011_40 : null,
+				"21": typeof json_MiningConcessions2018_41 !== 'undefined' ? json_MiningConcessions2018_41 : null,
+				"22": typeof json_Soil_29 !== 'undefined' ? json_Soil_29 : null,
+				"23": typeof json_UpperGroundwaterAquifers_39 !== 'undefined' ? json_UpperGroundwaterAquifers_39 : null,
+				"24": typeof json_Wetlands_30 !== 'undefined' ? json_Wetlands_30 : null,
+				"25": typeof json_Localities_38 !== 'undefined' ? json_Localities_38 : null,
+				"26": typeof json_CBA_SCALE_Communities_46 !== 'undefined' ? json_CBA_SCALE_Communities_46 : null
+			};
+
+			var targetData = dataMap[choice];
+			if (!targetData) { alert("Dados não carregados para esta camada."); return; }
+
+			try {
+				var clippedFeatures = [];
+				var stats = {};
+				var currentConfig = statsConfig[choice];
+
+				targetData.features.forEach(function(f) {
+					var intersected = null;
+					if (f.geometry.type === 'Point' || f.geometry.type === 'MultiPoint') {
+						if (turf.booleanPointInPolygon(f, userPolygon)) { intersected = f; }
+					} else {
+						intersected = turf.intersect(f, userPolygon);
+						if (intersected) { intersected.properties = f.properties; }
+					}
+
+					if (intersected) {
+						clippedFeatures.push(intersected);
+						var cat = intersected.properties[currentConfig.coluna] || "Outros";
+						if (currentConfig.operacao === 'sum') {
+							var val = parseFloat(intersected.properties[currentConfig.colValor]) || 0;
+							stats[cat] = (stats[cat] || 0) + val;
 						} else {
-							intersected = turf.intersect(f, userPolygon);
-							if (intersected) { intersected.properties = f.properties; }
+							stats[cat] = (stats[cat] || 0) + 1;
 						}
+					}
+				});
 
-						if (intersected) {
-							clippedFeatures.push(intersected);
-							var cat = intersected.properties[currentConfig.coluna] || "Outros";
-							if (currentConfig.operacao === 'sum') {
-								var val = parseFloat(intersected.properties[currentConfig.colValor]) || 0;
-								stats[cat] = (stats[cat] || 0) + val;
-							} else {
-								stats[cat] = (stats[cat] || 0) + 1;
-							}
-						}
-					});
-
-					if (clippedFeatures.length > 0) {
-						// 1. Atualizar Gráfico
-						document.getElementById('chart-container').style.display = 'block';
-						var ctx = document.getElementById('myChart').getContext('2d');
-						if (window.myChartInstance) { window.myChartInstance.destroy(); }
-						window.myChartInstance = new Chart(ctx, {
-							type: currentConfig.grafico,
-							data: {
-								labels: Object.keys(stats),
-								datasets: [{
-									// O label agora puxa dinamicamente o título da configuração
-									label: currentConfig.titulo, 
-									data: Object.values(stats),
-									backgroundColor: ['#2ecc71', '#3498db', '#e74c3c', '#f1c40f', '#9b59b6', '#1abc9c'],
-									borderWidth: 1
-								}]
-							},
-							options: {
-								responsive: true,
-								maintainAspectRatio: false,
-								plugins: {
-									title: { 
-										display: true, 
-										text: currentConfig.titulo // Título no topo do gráfico
-									},
-									legend: {
-										display: true,
-										position: 'top',
-										labels: {
-											// Isto remove o "undefined" e garante que o texto aparece
-											generateLabels: function(chart) {
-												const original = Chart.defaults.plugins.legend.labels.generateLabels;
-												let labels = original.call(this, chart);
-												labels.forEach(label => {
-													if (label.text === "undefined" || !label.text) {
-														label.text = currentConfig.operacao === 'sum' ? 'Total (Área/Valor)' : 'Total (Quantidade)';
-													}
-												});
-												return labels;
-											}
+				if (clippedFeatures.length > 0) {
+					// 1. Atualizar Gráfico
+					document.getElementById('chart-container').style.display = 'block';
+					var ctx = document.getElementById('myChart').getContext('2d');
+					if (window.myChartInstance) { window.myChartInstance.destroy(); }
+					window.myChartInstance = new Chart(ctx, {
+						type: currentConfig.grafico,
+						data: {
+							labels: Object.keys(stats),
+							datasets: [{
+								label: currentConfig.titulo, 
+								data: Object.values(stats),
+								backgroundColor: ['#2ecc71', '#3498db', '#e74c3c', '#f1c40f', '#9b59b6', '#1abc9c'],
+								borderWidth: 1
+							}]
+						},
+						options: {
+							responsive: true,
+							maintainAspectRatio: false,
+							plugins: {
+								title: { display: true, text: currentConfig.titulo },
+								legend: {
+									display: true,
+									position: 'top',
+									labels: {
+										generateLabels: function(chart) {
+											const original = Chart.defaults.plugins.legend.labels.generateLabels;
+											let labels = original.call(this, chart);
+											labels.forEach(label => {
+												if (label.text === "undefined" || !label.text) {
+													label.text = currentConfig.operacao === 'sum' ? 'Total (Área/Valor)' : 'Total (Quantidade)';
+												}
+											});
+											return labels;
 										}
-									},
-									tooltip: {
-										callbacks: {
-											label: function(context) {
-												let total = context.dataset.data.reduce((a, b) => a + b, 0);
-												let percentagem = ((context.raw / total) * 100).toFixed(2);
-												// Ajusta o sufixo conforme a operação
-												let sufixo = currentConfig.operacao === 'sum' ? ' ha' : ' unidades';
-												return context.label + ': ' + percentagem + '% (' + context.raw + sufixo + ')';
-											}
+									}
+								},
+								tooltip: {
+									callbacks: {
+										label: function(context) {
+											let total = context.dataset.data.reduce((a, b) => a + b, 0);
+											let percentagem = ((context.raw / total) * 100).toFixed(2);
+											let sufixo = currentConfig.operacao === 'sum' ? ' ha' : ' unidades';
+											return context.label + ': ' + percentagem + '% (' + context.raw + sufixo + ')';
 										}
 									}
 								}
 							}
-						});
-
-						// 2. Download GeoJSON
-						var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(turf.featureCollection(clippedFeatures)));
-						var dl = document.createElement('a');
-						dl.setAttribute("href", dataStr);
-						dl.setAttribute("download", "recorte_" + choice + ".geojson");
-						document.body.appendChild(dl); // Necessário para alguns browsers
-						dl.click();
-						dl.remove();
-					} else {
-						alert("Nenhum dado encontrado nesta área.");
-					}
-				} catch (err) {
-					console.error(err);
-					alert("Erro no processamento: " + err.message);
-				}
-			}
-
-			// --- LOGICA DO MENU PRINCIPAL ---
-			setTimeout(function() {
-				var action = prompt("O que deseja fazer?\n1. Clip (Recorte)\n2. Gerar Buffer\n3. Apagar");
-
-				if (action === "1") {
-					processarClip(layer);
-				} else if (action === "2") {
-					var raio = prompt("Raio em metros:", "500");
-					if (raio) {
-						var distKm = parseFloat(raio) / 1000;
-						var bufferGeo = turf.buffer(layer.toGeoJSON(), distKm, {units: 'kilometers'});
-						var bufferLayer = L.geoJSON(bufferGeo, {
-							style: { color: '#ff5722', fillOpacity: 0.2 }
-						}).addTo(drawnItems);
-						
-						// Pergunta se quer fazer clip do Buffer imediatamente
-						if(confirm("Buffer gerado! Deseja fazer o Clip desta área agora?")) {
-							processarClip(bufferLayer);
 						}
-					}
-				} else if (action === "3") {
-					drawnItems.removeLayer(layer);
-				}
-			}, 500);
-		});
+					});
 
+					// 2. Download GeoJSON
+					var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(turf.featureCollection(clippedFeatures)));
+					var dl = document.createElement('a');
+					dl.setAttribute("href", dataStr);
+					dl.setAttribute("download", "recorte_" + choice + ".geojson");
+					document.body.appendChild(dl);
+					dl.click();
+					dl.remove();
+				} else {
+					alert("Nenhum dado encontrado nesta área.");
+				}
+			} catch (err) {
+				console.error(err);
+				alert("Erro no processamento: " + err.message);
+			}
+		}
 
 		
 		// --- 1. FERRAMENTA DE IMPRESSÃO ---
