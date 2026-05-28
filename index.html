@@ -361,30 +361,32 @@
 		
 		
 		<!-- BOTÃO -->
-		<div id="legend-toggle">Legenda</div>
+		<div id="legend-toggle" style="cursor: pointer; padding: 5px; font-weight: bold; color: #0f435e;">Legenda</div>
 
-		<!-- LEGENDA -->
-		<div id="legend-container">
+		<div id="legend-container" style="display:none; background: #ebf3f1; padding: 12px; border-radius: 5px; border: 1px solid #0f435e; max-width: fit-content; box-shadow: 0 2px 10px rgba(0,0,0,0.2);">
+			
+			<div id="lulc_2020_2024" class="legend-section" style="display:none; margin-bottom: 10px;">
+				<h4 style="margin: 0 0 8px 0; color: #0f435e; font-size: 14px; font-weight: bold;">Uso e Cobertura da Terra (LULC)</h4>
+				<div style="display: flex; justify-content: center; align-items: flex-start;">
+					<img src="legend/lulc_2020_2024.png" alt="Legenda LULC" style="max-height: 380px; width: auto; display: block;">
+				</div>
+			</div>
 
-		  <div class="legend-section" id="lulc_2020_2024">
-			<h4>LULC (2020 & 2024)</h4>
-			<img src="legend/lulc_2020_2024.png">
-		  </div>
+			<div id="eco_2020_2024" class="legend-section" style="display:none; margin-bottom: 10px;">
+				<h4 style="margin: 0 0 8px 0; color: #0f435e; font-size: 14px; font-weight: bold;">Legenda de Ecossistemas</h4>
+				<div style="display: flex; gap: 15px; align-items: flex-start; flex-wrap: wrap;">
+					<img src="legend/eco_2020_2024.png" alt="Legenda Eco P1" style="max-height: 350px; width: auto; display: block;">
+					<img src="legend/eco_2020_20241.png" alt="Legenda Eco P2" style="max-height: 350px; width: auto; display: block;">
+				</div>
+			</div>
 
-		  <div class="legend-section" id="lulc_2020_2024">
-			<h4>Mudança LULC</h4>
-			<img src="legend/lulc_2020_2024.png">
-		  </div>
-
-		  <div class="legend-section" id="eco_2020_2024">
-			<h4>Ecossistemas (2020 & 2024)</h4>
-			<img src="legend/eco_2020_2024.png">
-		  </div>
-
-		  <div class="legend-section" id="eco_dinamic">
-			<h4>Mudança Ecossistemas</h4>
-			<img src="legend/eco_dinamic.png">
-		  </div>
+			<div id="eco_dinamic" class="legend-section" style="display:none; margin-bottom: 10px;">
+				<h4 style="margin: 0 0 8px 0; color: #0f435e; font-size: 14px; font-weight: bold;">Dinâmica de Alteração</h4>
+				<div style="display: flex; gap: 15px; align-items: flex-start; flex-wrap: wrap;">
+					<img src="legend/eco_dinamic.png" alt="Legenda Dinâmica P1" style="max-height: 350px; width: auto; display: block;">
+					<img src="legend/eco_dinamic1.png" alt="Legenda Dinâmica P2" style="max-height: 350px; width: auto; display: block;">
+				</div>
+			</div>
 
 		</div>
 		
@@ -3763,6 +3765,10 @@
 		}
 		
 		// --- FERRAMENTA DE INTERSEÇÃO ---
+		// =========================================================================
+		// --- FERRAMENTA DE INTERSEÇÃO MULTI-CAMADA (DIST/POSTO/LOCALIDADE) ---
+		// =========================================================================
+		
 		var IntersectControl = L.Control.extend({
 			options: { position: 'topleft' },
 			onAdd: function (map) {
@@ -3771,7 +3777,6 @@
 				button.innerHTML = '<i class="fas fa-object-group"></i>';
 				button.title = 'Interseção: Pontos em Polígonos';
 
-				// Estilização base do botão para manter a consistência do painel esquerdo
 				button.style.backgroundColor = '#ebf3f1';
 				button.style.width = '30px';
 				button.style.height = '30px';
@@ -3785,19 +3790,24 @@
 					L.DomEvent.preventDefault(e);
 
 					if (typeof turf === 'undefined') {
-						alert("Erro: A biblioteca Turf.js não carregou. Verifique a ligação à internet.");
+						alert("Erro: A biblioteca Turf.js não foi detetada no portal.");
 						return;
 					}
 
-					// Abre a janela flutuante customizada
 					abrirMenuIntersecao();
 				};
 				return container;
 			}
 		});
-		map.addControl(new IntersectControl());
 
-		// --- FUNÇÕES DE INTERFACE E GEOPROCESSAMENTO ---
+		// Controlo de instância única (Evita duplicação de botões)
+		if (typeof window.meuControloIntersecaoUnico === 'undefined' || window.meuControloIntersecaoUnico === null) {
+			var botoesAntigos = document.querySelectorAll('.intersect-button');
+			botoesAntigos.forEach(function(b) { if (b.parentElement) b.parentElement.remove(); });
+
+			window.meuControloIntersecaoUnico = new IntersectControl();
+			map.addControl(window.meuControloIntersecaoUnico);
+		}
 
 		function fecharModalIntersecao() {
 			var modal = document.getElementById('modal-intersect-container');
@@ -3829,39 +3839,11 @@
 				{ id: "7", nome: "Comunidades do Projecto CBA SCALE+" }
 			];
 
-			var COLUNA_DISTRITO = "DISTRITO"; 
-			var distritosOptionsHtml = '<option value="todos_distritos">-- Todos os Distritos (Shape Inteiro) --</option>';
-			
-			if (typeof json_Districts_36 !== 'undefined' && json_Districts_36 && json_Districts_36.features) {
-				var nomesEncontrados = [];
-				
-				json_Districts_36.features.forEach(function(f) {
-					var nomeDistrito = f.properties[COLUNA_DISTRITO];
-					
-					if (!nomeDistrito) {
-						nomeDistrito = f.properties.distrito || f.properties.NOMEDIST || f.properties.Nome || f.properties.name;
-					}
-					
-					if (nomeDistrito && !nomesEncontrados.includes(nomeDistrito.toString().trim())) {
-						nomesEncontrados.push(nomeDistrito.toString().trim());
-					}
-				});
-				
-				nomesEncontrados.sort();
-				nomesEncontrados.forEach(nome => {
-					distritosOptionsHtml += `<option value="${nome}">${nome}</option>`;
-				});
-			}
-
 			var polyOptionsHtml = "";
-			listaPoligonos.forEach(p => {
-				polyOptionsHtml += `<option value="${p.id}">${p.id}. ${p.nome}</option>`;
-			});
+			listaPoligonos.forEach(p => { polyOptionsHtml += `<option value="${p.id}">${p.id}. ${p.nome}</option>`; });
 
 			var pointOptionsHtml = "";
-			listaPontos.forEach(pt => {
-				pointOptionsHtml += `<option value="${pt.id}">${pt.id}. ${pt.nome}</option>`;
-			});
+			listaPontos.forEach(pt => { pointOptionsHtml += `<option value="${pt.id}">${pt.id}. ${pt.nome}</option>`; });
 
 			var modalHtml = `
 				<div id="modal-intersect-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100005; display: flex; align-items: center; justify-content: center; font-family: 'Arial', sans-serif;">
@@ -3876,10 +3858,9 @@
 						</div>
 
 						<div id="container-filtro-especifico" style="margin-bottom: 15px; display: none;">
-							<label style="font-size: 13px; font-weight: bold; color: #d35400; display: block; margin-bottom: 5px;">↳ Escolha o Distrito Específico:</label>
+							<label id="label-filtro-dinamico" style="font-size: 13px; font-weight: bold; color: #d35400; display: block; margin-bottom: 5px;">↳ Escolha a Opção:</label>
 							<select id="select-intersect-district-filter" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #d35400; background: #fff5e6; font-size: 13px; color: #d35400; font-weight: bold;">
-								${distritosOptionsHtml}
-							</select>
+								</select>
 						</div>
 
 						<div>
@@ -3901,14 +3882,54 @@
 
 			var selectPoly = document.getElementById('select-intersect-poly');
 			var containerFiltro = document.getElementById('container-filtro-especifico');
+			var labelFiltro = document.getElementById('label-filtro-dinamico');
 			var selectDistrict = document.getElementById('select-intersect-district-filter');
 
 			selectPoly.onchange = function() {
-				if (selectPoly.value === "1") {
+				var escolha = selectPoly.value;
+				var optionsHtml = "";
+				var nomesEncontrados = [];
+				var targetJson = null;
+				
+				// Configuração das colunas exatas indicadas para cada ficheiro
+				var colunaAlvo = "";
+				if (escolha === "1") { 
+					colunaAlvo = "DISTRITO"; 
+					labelFiltro.innerText = "↳ Escolha o Distrito Específico:";
+					targetJson = typeof json_Districts_36 !== 'undefined' ? json_Districts_36 : null;
+					optionsHtml = '<option value="todos_distritos">-- Todos os Distritos (Shape Inteiro) --</option>';
+				} else if (escolha === "2") { 
+					colunaAlvo = "ADM3_PT"; 
+					labelFiltro.innerText = "↳ Escolha o Posto Administrativo:";
+					targetJson = typeof json_AdministrativePosts_37 !== 'undefined' ? json_AdministrativePosts_37 : null;
+					optionsHtml = '<option value="todos_distritos">-- Todos os Postos (Shape Inteiro) --</option>';
+				} else if (escolha === "9") { 
+					colunaAlvo = "Localidade"; 
+					labelFiltro.innerText = "↳ Escolha a Localidade Específica:";
+					targetJson = typeof json_Localities_38 !== 'undefined' ? json_Localities_38 : null;
+					optionsHtml = '<option value="todos_distritos">-- Todas as Localidades (Shape Inteiro) --</option>';
+				}
+
+				if ((escolha === "1" || escolha === "2" || escolha === "9") && targetJson && targetJson.features) {
+					targetJson.features.forEach(function(f) {
+						var nomeFeicao = f.properties[colunaAlvo];
+						if (!nomeFeicao) {
+							// Fallbacks caso alguma linha específica falhe
+							nomeFeicao = f.properties.posto || f.properties.localidade || f.properties.distrito || f.properties.Nome;
+						}
+						if (nomeFeicao && !nomesEncontrados.includes(nomeFeicao.toString().trim())) {
+							nomesEncontrados.push(nomeFeicao.toString().trim());
+						}
+					});
+					
+					nomesEncontrados.sort();
+					nomesEncontrados.forEach(nome => { optionsHtml += `<option value="${nome}">${nome}</option>`; });
+					
+					selectDistrict.innerHTML = optionsHtml;
 					containerFiltro.style.display = "block";
 					selectDistrict.disabled = false;
 				} else {
-					selectDistrict.value = "todos_distritos";
+					selectDistrict.innerHTML = '<option value="todos_distritos">-- Todo o Shapefile --</option>';
 					selectDistrict.disabled = true;
 					containerFiltro.style.display = "none";
 				}
@@ -3949,22 +3970,25 @@
 			var pointData = pointsMap[pointChoice];
 
 			if (!polyData || !pointData) {
-				var msgErro = !polyData ? `Camada de Polígono (${polyChoice}) não definida no mapa. ` : "";
-				msgErro += !pointData ? `Camada de Pontos (${pointChoice}) não definida no mapa.` : "";
+				var msgErro = !polyData ? `Camada de Polígono (${polyChoice}) não definida. ` : "";
+				msgErro += !pointData ? `Camada de Pontos (${pointChoice}) não definida.` : "";
 				exibirMensagemResultado("Aviso", "Erro de Carregamento: " + msgErro, "#e74c3c");
 				return;
 			}
 
 			var mascaraFinal = polyData;
 
-			// CORREÇÃO CRÍTICA: Isolar a lógica do filtro APENAS se a escolha for a camada 1 (Distritos)
-			if (polyChoice === "1" && distritoEscolhido !== "todos_distritos") {
-				var COLUNA_DISTRITO = "DISTRITO"; 
+			// Filtros de isolamento espacial reconfigurados por camada
+			if ((polyChoice === "1" || polyChoice === "2" || polyChoice === "9") && distritoEscolhido !== "todos_distritos") {
 				
-				var feicaoIsolada = json_Districts_36.features.find(function(f) {
-					var nome = f.properties[COLUNA_DISTRITO];
+				var campoFiltro = "DISTRITO";
+				if (polyChoice === "2") campoFiltro = "ADM3_PT";
+				if (polyChoice === "9") campoFiltro = "Localidade";
+
+				var feicaoIsolada = polyData.features.find(function(f) {
+					var nome = f.properties[campoFiltro];
 					if (!nome) {
-						nome = f.properties.distrito || f.properties.NOMEDIST || f.properties.Nome || f.properties.name;
+						nome = f.properties.posto || f.properties.localidade || f.properties.distrito || f.properties.Nome;
 					}
 					return nome && nome.toString().trim().toUpperCase() === distritoEscolhido.toString().trim().toUpperCase();
 				});
@@ -3972,13 +3996,12 @@
 				if (feicaoIsolada) {
 					mascaraFinal = turf.featureCollection([feicaoIsolada]);
 				} else {
-					exibirMensagemResultado("Aviso", `Não foi possível isolar o polígono do distrito: ${distritoEscolhido}`, "#e67e22");
+					exibirMensagemResultado("Aviso", `Não foi possível isolar a feição selecionada: ${distritoEscolhido}`, "#e67e22");
 					return;
 				}
 			}
 
 			try {
-				// Executa a interseção geométrica com a máscara correta (seja um distrito ou outra camada completa)
 				var ptsWithin = turf.pointsWithinPolygon(pointData, mascaraFinal);
 
 				if (ptsWithin.features.length > 0) {
@@ -3986,31 +4009,31 @@
 					var dl = document.createElement('a');
 					dl.setAttribute("href", dataStr);
 					
-					var sufixoNome = (polyChoice === "1" && distritoEscolhido !== "todos_distritos") ? distritoEscolhido.toLowerCase().replace(/ /g, "_") : "camada_" + polyChoice;
+					var sufixoNome = (distritoEscolhido !== "todos_distritos") ? distritoEscolhido.toLowerCase().replace(/ /g, "_") : "camada_" + polyChoice;
 					dl.setAttribute("download", `intersecao_${sufixoNome}_pontos_${pointChoice}.geojson`);
 					document.body.appendChild(dl);
 					dl.click();
 					dl.remove();
 
-					var localSucesso = (polyChoice === "1" && distritoEscolhido !== "todos_distritos") ? `no distrito de <b>${distritoEscolhido}</b>` : "na área selecionada";
-					exibirMensagemResultado("Sucesso!", `Foram encontrados <b>${ptsWithin.features.length}</b> pontos ${localSucesso}.<br><br><i>O download do GeoJSON foi iniciado.</i>`, "#2ecc71");
+					var localSucesso = (distritoEscolhido !== "todos_distritos") ? `em <b>${distritoEscolhido}</b>` : "na área selecionada";
+					exibirMensagemResultado("Sucesso!", `Foram encontrados <b>${ptsWithin.features.length}</b> pontos ${localSucesso}.<br><br><i>O download do ficheiro GeoJSON foi iniciado.</i>`, "#2ecc71");
 				} else {
-					var localVazio = (polyChoice === "1" && distritoEscolhido !== "todos_distritos") ? `dentro do distrito de ${distritoEscolhido}` : "na área selecionada";
+					var localVazio = (distritoEscolhido !== "todos_distritos") ? `dentro de ${distritoEscolhido}` : "na área selecionada";
 					exibirMensagemResultado("Análise Concluída", `Nenhum ponto foi encontrado ${localVazio}.`, "#0f435e");
 				}
 			} catch (err) {
 				console.error(err);
-				exibirMensagemResultado("Erro", "Falha no processamento espacial do Turf.js: " + err.message, "#e74c3c");
+				exibirMensagemResultado("Erro", "Falha no Turf.js: " + err.message, "#e74c3c");
 			}
 		}
 
-		function exibirMensagemResultado(titulo, mensagem, corDestaque) {
+		function exibirMensagemResultado(titulo, message, corDestaque) {
 			fecharModalIntersecao();
 			var resultadoHtml = `
 				<div id="modal-intersect-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100005; display: flex; align-items: center; justify-content: center; font-family: 'Arial', sans-serif;">
 					<div style="background: #ebf3f1; padding: 20px; border-radius: 8px; width: 310px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid ${corDestaque};">
 						<h4 style="margin-top: 0; color: ${corDestaque}; font-size: 16px;">${titulo}</h4>
-						<p style="font-size: 13px; color: #333; line-height: 1.4; margin-bottom: 15px;">${mensagem}</p>
+						<p style="font-size: 13px; color: #333; line-height: 1.4; margin-bottom: 15px;">${message}</p>
 						<button onclick="fecharModalIntersecao()" style="background: ${corDestaque}; color: white; border: none; padding: 8px 25px; border-radius: 4px; cursor: pointer; font-weight: bold;">Fechar</button>
 					</div>
 				</div>
@@ -4517,60 +4540,68 @@
 		}
 		
 		//////////////////////////////////////
-		// MAPEAR LAYERS → LEGENDAS
+		// MAPEAR LAYERS → LEGENDAS (COM SPLIT)
 		//////////////////////////////////////
 
 		var layerLegendMap = new Map();
 
-		// LULC 2020 + 2024
-		layerLegendMap.set(layer_2020_Govuro_1, "lulc_2020_2024");
-		layerLegendMap.set(layer_2020_Inhassoro_2, "lulc_2020_2024");
-		layerLegendMap.set(layer_2020_Mabote_3, "lulc_2020_2024");
-		layerLegendMap.set(layer_2020_Vilankulo_4, "lulc_2020_2024");
+		// Nota: Agora passamos os IDs dentro de um Array [parte1, parte2] para cada grupo
 
-		layerLegendMap.set(layer_2024_Govuro_5, "lulc_2020_2024");
-		layerLegendMap.set(layer_2024_Inhassoro_6, "lulc_2020_2024");
-		layerLegendMap.set(layer_2024_Mabote_7, "lulc_2020_2024");
-		layerLegendMap.set(layer_2024_Vilankulo_8, "lulc_2020_2024");
+		// LULC 2020 + 2024
+		layerLegendMap.set(layer_2020_Govuro_1, ["lulc_2020_2024", "lulc_2020_20241"]);
+		layerLegendMap.set(layer_2020_Inhassoro_2, ["lulc_2020_2024", "lulc_2020_20241"]);
+		layerLegendMap.set(layer_2020_Mabote_3, ["lulc_2020_2024", "lulc_2020_20241"]);
+		layerLegendMap.set(layer_2020_Vilankulo_4, ["lulc_2020_2024", "lulc_2020_20241"]);
+
+		layerLegendMap.set(layer_2024_Govuro_5, ["lulc_2020_2024", "lulc_2020_20241"]);
+		layerLegendMap.set(layer_2024_Inhassoro_6, ["lulc_2020_2024", "lulc_2020_20241"]);
+		layerLegendMap.set(layer_2024_Mabote_7, ["lulc_2020_2024", "lulc_2020_20241"]);
+		layerLegendMap.set(layer_2024_Vilankulo_8, ["lulc_2020_2024", "lulc_2020_20241"]);
 
 		// Mudança LULC
-		layerLegendMap.set(layer_2020_2024_Govuro_9, "lulc_2020_2024");
-		layerLegendMap.set(layer_2020_2024_Inhassoro_10, "lulc_2020_2024");
-		layerLegendMap.set(layer_2020_2024_Mabote_11, "lulc_2020_2024");
-		layerLegendMap.set(layer_2020_2024_Vilankulo_12, "lulc_2020_2024");
+		layerLegendMap.set(layer_2020_2024_Govuro_9, ["lulc_2020_2024", "lulc_2020_20241"]);
+		layerLegendMap.set(layer_2020_2024_Inhassoro_10, ["lulc_2020_2024", "lulc_2020_20241"]);
+		layerLegendMap.set(layer_2020_2024_Mabote_11, ["lulc_2020_2024", "lulc_2020_20241"]);
+		layerLegendMap.set(layer_2020_2024_Vilankulo_12, ["lulc_2020_2024", "lulc_2020_20241"]);
 
 		// Ecossistemas 2020 + 2024
-		layerLegendMap.set(layer_2020_Govuro_13, "eco_2020_2024");
-		layerLegendMap.set(layer_2020_Inhassoro_14, "eco_2020_2024");
-		layerLegendMap.set(layer_2020_Mabote_15, "eco_2020_2024");
-		layerLegendMap.set(layer_2020_Vilankulo_16, "eco_2020_2024");
+		layerLegendMap.set(layer_2020_Govuro_13, ["eco_2020_2024", "eco_2020_20241"]);
+		layerLegendMap.set(layer_2020_Inhassoro_14, ["eco_2020_2024", "eco_2020_20241"]);
+		layerLegendMap.set(layer_2020_Mabote_15, ["eco_2020_2024", "eco_2020_20241"]);
+		layerLegendMap.set(layer_2020_Vilankulo_16, ["eco_2020_2024", "eco_2020_20241"]);
 
-		layerLegendMap.set(layer_2024_Govuro_17, "eco_2020_2024");
-		layerLegendMap.set(layer_2024_Inhassoro_18, "eco_2020_2024");
-		layerLegendMap.set(layer_2024_Mabote_19, "eco_2020_2024");
-		layerLegendMap.set(layer_2024_Vilankulo_20, "eco_2020_2024");
+		layerLegendMap.set(layer_2024_Govuro_17, ["eco_2020_2024", "eco_2020_20241"]);
+		layerLegendMap.set(layer_2024_Inhassoro_18, ["eco_2020_2024", "eco_2020_20241"]);
+		layerLegendMap.set(layer_2024_Mabote_19, ["eco_2020_2024", "eco_2020_20241"]);
+		layerLegendMap.set(layer_2024_Vilankulo_20, ["eco_2020_2024", "eco_2020_20241"]);
 
-		// Mudança Ecossistemas
-		layerLegendMap.set(layer_20202024_Govuro_21, "eco_dinamic");
-		layerLegendMap.set(layer_20202024_Inhassoro_22, "eco_dinamic");
-		layerLegendMap.set(layer_20202024_Mabote_23, "eco_dinamic");
-		layerLegendMap.set(layer_20202024_Vilankulo_24, "eco_dinamic");
+		// Mudança Ecossistemas (Dinâmico)
+		layerLegendMap.set(layer_20202024_Govuro_21, ["eco_dinamic", "eco_dinamic1"]);
+		layerLegendMap.set(layer_20202024_Inhassoro_22, ["eco_dinamic", "eco_dinamic1"]);
+		layerLegendMap.set(layer_20202024_Mabote_23, ["eco_dinamic", "eco_dinamic1"]);
+		layerLegendMap.set(layer_20202024_Vilankulo_24, ["eco_dinamic", "eco_dinamic1"]);
 
 
-		// ===============================
-		// ATUALIZAR LEGENDAS (FIX FINAL)
-		// ===============================
+		// ===================================
+		// ATUALIZAR LEGENDAS (MÚLTIPLOS IDS)
+		// ===================================
 		function updateLegends() {
-
-			// esconder tudo
+			
+			// 1. Esconder absolutamente todas as seções de legenda primeiro
 			document.querySelectorAll('.legend-section').forEach(el => {
 				el.style.display = "none";
 			});
 
-			// mostrar apenas layers ativos
-			layerLegendMap.forEach(function(legendId, layer) {
+			// 2. Correr o mapa e exibir os elementos correspondentes aos layers ativos
+			layerLegendMap.forEach(function(legendIds, layer) {
 				if (map.hasLayer(layer)) {
-					document.getElementById(legendId).style.display = "block";
+					// Como legendIds agora é uma lista (Array), fazemos um loop interno nela
+					legendIds.forEach(function(id) {
+						var el = document.getElementById(id);
+						if (el) {
+							el.style.display = "block";
+						}
+					});
 				}
 			});
 		}
@@ -4600,9 +4631,7 @@
 		var legendVisible = false;
 
 		document.getElementById("legend-toggle").onclick = function () {
-
 			var legend = document.getElementById("legend-container");
-
 			legendVisible = !legendVisible;
 
 			if (legendVisible) {
