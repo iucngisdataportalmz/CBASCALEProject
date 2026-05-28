@@ -3698,7 +3698,7 @@
 			var modalHtml = `
 				<div id="modal-export-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100005; display: flex; align-items: center; justify-content: center; font-family: 'Arial', sans-serif;">
 					<div style="background: #ebf3f1; padding: 25px; border-radius: 8px; width: 360px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f435e;">
-						<h3 style="margin-top: 0; color: #0f435e; text-align: center; border-bottom: 2px solid #ccc; padding-bottom: 8px;">Exportar Camada Ativa</h3>
+						<h3 style="margin-top: 0; color: #0f435e; text-align: center; border-bottom: 2px solid #ccc; padding-bottom: 8px;">Exportar Camada Activa</h3>
 						<p style="font-size: 13px; color: #333; margin-bottom: 12px; text-align: center;">Selecione uma das camadas visíveis no mapa para descarregar em formato GeoJSON:</p>
 						
 						<select id="select-export-layer" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #0f435e; background: white; font-size: 13px; margin-bottom: 25px; max-height: 150px;">
@@ -3797,7 +3797,7 @@
 		});
 		map.addControl(new IntersectControl());
 
-		// --- FUNÇÕES DE INTERFACE PARA A FERRAMENTA DE INTERSEÇÃO ---
+		// --- FUNÇÕES DE INTERFACE E GEOPROCESSAMENTO ---
 
 		function fecharModalIntersecao() {
 			var modal = document.getElementById('modal-intersect-container');
@@ -3807,7 +3807,6 @@
 		function abrirMenuIntersecao() {
 			fecharModalIntersecao();
 
-			// Dicionários estruturados para gerar as opções visuais
 			var listaPoligonos = [
 				{ id: "1", nome: "Distritos" },
 				{ id: "2", nome: "Postos Administrativos" },
@@ -3830,6 +3829,30 @@
 				{ id: "7", nome: "Comunidades do Projecto CBA SCALE+" }
 			];
 
+			var COLUNA_DISTRITO = "DISTRITO"; 
+			var distritosOptionsHtml = '<option value="todos_distritos">-- Todos os Distritos (Shape Inteiro) --</option>';
+			
+			if (typeof json_Districts_36 !== 'undefined' && json_Districts_36 && json_Districts_36.features) {
+				var nomesEncontrados = [];
+				
+				json_Districts_36.features.forEach(function(f) {
+					var nomeDistrito = f.properties[COLUNA_DISTRITO];
+					
+					if (!nomeDistrito) {
+						nomeDistrito = f.properties.distrito || f.properties.NOMEDIST || f.properties.Nome || f.properties.name;
+					}
+					
+					if (nomeDistrito && !nomesEncontrados.includes(nomeDistrito.toString().trim())) {
+						nomesEncontrados.push(nomeDistrito.toString().trim());
+					}
+				});
+				
+				nomesEncontrados.sort();
+				nomesEncontrados.forEach(nome => {
+					distritosOptionsHtml += `<option value="${nome}">${nome}</option>`;
+				});
+			}
+
 			var polyOptionsHtml = "";
 			listaPoligonos.forEach(p => {
 				polyOptionsHtml += `<option value="${p.id}">${p.id}. ${p.nome}</option>`;
@@ -3842,18 +3865,25 @@
 
 			var modalHtml = `
 				<div id="modal-intersect-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100005; display: flex; align-items: center; justify-content: center; font-family: 'Arial', sans-serif;">
-					<div style="background: #ebf3f1; padding: 25px; border-radius: 8px; width: 360px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f435e;">
+					<div style="background: #ebf3f1; padding: 25px; border-radius: 8px; width: 380px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid #0f435e;">
 						<h3 style="margin-top: 0; color: #0f435e; text-align: center; border-bottom: 2px solid #ccc; padding-bottom: 8px;">Análise de Interseção</h3>
 						
 						<div style="margin-top: 15px;">
-							<label style="font-size: 13px; font-weight: bold; color: #0f435e; display: block; margin-bottom: 5px;">1. Selecione a ÁREA (Polígono):</label>
+							<label style="font-size: 13px; font-weight: bold; color: #0f435e; display: block; margin-bottom: 5px;">1. Selecione a ÁREA de Referência (Polígono):</label>
 							<select id="select-intersect-poly" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #0f435e; background: white; font-size: 13px; margin-bottom: 15px;">
 								${polyOptionsHtml}
 							</select>
 						</div>
 
+						<div id="container-filtro-especifico" style="margin-bottom: 15px; display: none;">
+							<label style="font-size: 13px; font-weight: bold; color: #d35400; display: block; margin-bottom: 5px;">↳ Escolha o Distrito Específico:</label>
+							<select id="select-intersect-district-filter" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #d35400; background: #fff5e6; font-size: 13px; color: #d35400; font-weight: bold;">
+								${distritosOptionsHtml}
+							</select>
+						</div>
+
 						<div>
-							<label style="font-size: 13px; font-weight: bold; color: #0f435e; display: block; margin-bottom: 5px;">2. Selecione os PONTOS:</label>
+							<label style="font-size: 13px; font-weight: bold; color: #0f435e; display: block; margin-bottom: 5px;">2. Selecione os PONTOS alvo:</label>
 							<select id="select-intersect-point" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #0f435e; background: white; font-size: 13px; margin-bottom: 25px;">
 								${pointOptionsHtml}
 							</select>
@@ -3868,14 +3898,31 @@
 			`;
 
 			document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+			var selectPoly = document.getElementById('select-intersect-poly');
+			var containerFiltro = document.getElementById('container-filtro-especifico');
+			var selectDistrict = document.getElementById('select-intersect-district-filter');
+
+			selectPoly.onchange = function() {
+				if (selectPoly.value === "1") {
+					containerFiltro.style.display = "block";
+					selectDistrict.disabled = false;
+				} else {
+					selectDistrict.value = "todos_distritos";
+					selectDistrict.disabled = true;
+					containerFiltro.style.display = "none";
+				}
+			};
+
+			selectPoly.dispatchEvent(new Event('change'));
 		}
 
 		function executarProcessamentoIntersecao() {
 			var polyChoice = document.getElementById('select-intersect-poly').value;
+			var distritoEscolhido = document.getElementById('select-intersect-district-filter').value;
 			var pointChoice = document.getElementById('select-intersect-point').value;
 			fecharModalIntersecao();
 
-			// Mapeamento completo e seguro dos objetos JSON globais
 			var polygonsMap = {
 				"1": typeof json_Districts_36 !== 'undefined' ? json_Districts_36 : null,
 				"2": typeof json_AdministrativePosts_37 !== 'undefined' ? json_AdministrativePosts_37 : null,
@@ -3889,12 +3936,12 @@
 			};
 			
 			var pointsMap = {
-				"1": typeof json_Schools_52 !== 'undefined' ? json_Schools_52 : null,
-				"2": typeof json_HealthFacilities_53 !== 'undefined' ? json_HealthFacilities_53 : null,
+				"1": typeof json_Schools_51 !== 'undefined' ? json_Schools_51 : (typeof json_Schools_52 !== 'undefined' ? json_Schools_52 : null),
+				"2": typeof json_HealthFacilities_52 !== 'undefined' ? json_HealthFacilities_52 : (typeof json_HealthFacilities_53 !== 'undefined' ? json_HealthFacilities_53 : null),
 				"3": typeof json_CitiesandVillages_43 !== 'undefined' ? json_CitiesandVillages_43 : null,
-				"4": typeof json_MajorCities_50 !== 'undefined' ? json_MajorCities_50 : null,
+				"4": typeof json_MajorCities_49 !== 'undefined' ? json_MajorCities_49 : (typeof json_MajorCities_50 !== 'undefined' ? json_MajorCities_50 : null),
 				"5": typeof json_PopulatedPlaces_45 !== 'undefined' ? json_PopulatedPlaces_45 : null,
-				"6": typeof json_Fishingcenters_51 !== 'undefined' ? json_Fishingcenters_51 : null,
+				"6": typeof json_Fishingcenters_50 !== 'undefined' ? json_Fishingcenters_50 : (typeof json_Fishingcenters_51 !== 'undefined' ? json_Fishingcenters_51 : null),
 				"7": typeof json_CBA_SCALE_Communities_46 !== 'undefined' ? json_CBA_SCALE_Communities_46 : null
 			};
 
@@ -3902,40 +3949,66 @@
 			var pointData = pointsMap[pointChoice];
 
 			if (!polyData || !pointData) {
-				exibirMensagemResultado("Aviso", "Erro: Não foi possível encontrar os dados de uma das camadas selecionadas.", "#e74c3c");
+				var msgErro = !polyData ? `Camada de Polígono (${polyChoice}) não definida no mapa. ` : "";
+				msgErro += !pointData ? `Camada de Pontos (${pointChoice}) não definida no mapa.` : "";
+				exibirMensagemResultado("Aviso", "Erro de Carregamento: " + msgErro, "#e74c3c");
 				return;
 			}
 
+			var mascaraFinal = polyData;
+
+			// CORREÇÃO CRÍTICA: Isolar a lógica do filtro APENAS se a escolha for a camada 1 (Distritos)
+			if (polyChoice === "1" && distritoEscolhido !== "todos_distritos") {
+				var COLUNA_DISTRITO = "DISTRITO"; 
+				
+				var feicaoIsolada = json_Districts_36.features.find(function(f) {
+					var nome = f.properties[COLUNA_DISTRITO];
+					if (!nome) {
+						nome = f.properties.distrito || f.properties.NOMEDIST || f.properties.Nome || f.properties.name;
+					}
+					return nome && nome.toString().trim().toUpperCase() === distritoEscolhido.toString().trim().toUpperCase();
+				});
+
+				if (feicaoIsolada) {
+					mascaraFinal = turf.featureCollection([feicaoIsolada]);
+				} else {
+					exibirMensagemResultado("Aviso", `Não foi possível isolar o polígono do distrito: ${distritoEscolhido}`, "#e67e22");
+					return;
+				}
+			}
+
 			try {
-				// Execução do cálculo espacial via Turf.js
-				var ptsWithin = turf.pointsWithinPolygon(pointData, polyData);
+				// Executa a interseção geométrica com a máscara correta (seja um distrito ou outra camada completa)
+				var ptsWithin = turf.pointsWithinPolygon(pointData, mascaraFinal);
 
 				if (ptsWithin.features.length > 0) {
-					// Criação e disparo do download do GeoJSON gerado
 					var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(ptsWithin));
 					var dl = document.createElement('a');
 					dl.setAttribute("href", dataStr);
-					dl.setAttribute("download", "resultado_intersecao_camada_" + pointChoice + ".geojson");
+					
+					var sufixoNome = (polyChoice === "1" && distritoEscolhido !== "todos_distritos") ? distritoEscolhido.toLowerCase().replace(/ /g, "_") : "camada_" + polyChoice;
+					dl.setAttribute("download", `intersecao_${sufixoNome}_pontos_${pointChoice}.geojson`);
 					document.body.appendChild(dl);
 					dl.click();
 					dl.remove();
 
-					exibirMensagemResultado("Sucesso!", `Foram encontrados <b>${ptsWithin.features.length}</b> pontos dentro da área selecionada.<br><br><i>O download do ficheiro GeoJSON foi iniciado automaticamente.</i>`, "#2ecc71");
+					var localSucesso = (polyChoice === "1" && distritoEscolhido !== "todos_distritos") ? `no distrito de <b>${distritoEscolhido}</b>` : "na área selecionada";
+					exibirMensagemResultado("Sucesso!", `Foram encontrados <b>${ptsWithin.features.length}</b> pontos ${localSucesso}.<br><br><i>O download do GeoJSON foi iniciado.</i>`, "#2ecc71");
 				} else {
-					exibirMensagemResultado("Análise Concluída", "Nenhum ponto encontrado dentro do limite da área selecionada.", "#0f435e");
+					var localVazio = (polyChoice === "1" && distritoEscolhido !== "todos_distritos") ? `dentro do distrito de ${distritoEscolhido}` : "na área selecionada";
+					exibirMensagemResultado("Análise Concluída", `Nenhum ponto foi encontrado ${localVazio}.`, "#0f435e");
 				}
 			} catch (err) {
 				console.error(err);
-				exibirMensagemResultado("Erro", "Ocorreu um erro ao processar a interseção: " + err.message, "#e74c3c");
+				exibirMensagemResultado("Erro", "Falha no processamento espacial do Turf.js: " + err.message, "#e74c3c");
 			}
 		}
 
-		// Auxiliar para substituir os antigos 'alerts' de resultado por caixas elegantes
 		function exibirMensagemResultado(titulo, mensagem, corDestaque) {
 			fecharModalIntersecao();
 			var resultadoHtml = `
 				<div id="modal-intersect-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100005; display: flex; align-items: center; justify-content: center; font-family: 'Arial', sans-serif;">
-					<div style="background: #ebf3f1; padding: 20px; border-radius: 8px; width: 300px; text-align: center; box-shadow: 0 4px 15 rgba(0,0,0,0.3); border: 2px solid ${corDestaque};">
+					<div style="background: #ebf3f1; padding: 20px; border-radius: 8px; width: 310px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid ${corDestaque};">
 						<h4 style="margin-top: 0; color: ${corDestaque}; font-size: 16px;">${titulo}</h4>
 						<p style="font-size: 13px; color: #333; line-height: 1.4; margin-bottom: 15px;">${mensagem}</p>
 						<button onclick="fecharModalIntersecao()" style="background: ${corDestaque}; color: white; border: none; padding: 8px 25px; border-radius: 4px; cursor: pointer; font-weight: bold;">Fechar</button>
