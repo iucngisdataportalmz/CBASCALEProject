@@ -477,7 +477,7 @@
             highlightLayer.openPopup();
         }
         var map = L.map('map', {
-            zoomControl:false, maxZoom:28, minZoom:1
+            zoomControl:false, maxZoom:28, minZoom:1, preferCanvas: true
         }).fitBounds([[-23.289084329645494,32.65691568405621],[-20.63483398465303,36.21148774607011]]);
         var hash = new L.Hash(map);
         map.attributionControl.setPrefix('<a href="https://github.com/qgis2web/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
@@ -1776,6 +1776,7 @@
             pane: 'pane_Districts_36',
             onEachFeature: pop_Districts_36,
             style: style_Districts_36_0,
+			smoothFactor: 1.5 // <--- reduz o processamento de vértices no telemóvel
         });
         bounds_group.addLayer(layer_Districts_36);
         map.addLayer(layer_Districts_36);
@@ -1833,6 +1834,7 @@
             pane: 'pane_AdministrativePosts_37',
             onEachFeature: pop_AdministrativePosts_37,
             style: style_AdministrativePosts_37_0,
+			smoothFactor: 1.5 // <--- reduz o processamento de vértices no telemóvel
         });
         bounds_group.addLayer(layer_AdministrativePosts_37);
         map.addLayer(layer_AdministrativePosts_37);
@@ -1902,9 +1904,10 @@
             pane: 'pane_Localities_38',
             onEachFeature: pop_Localities_38,
             style: style_Localities_38_0,
+			smoothFactor: 1.5 // <--- reduz o processamento de vértices no telemóvel
         });
         bounds_group.addLayer(layer_Localities_38);
-        map.addLayer(layer_Localities_38);
+        //map.addLayer(layer_Localities_38);
         function pop_UpperGroundwaterAquifers_39(feature, layer) {
             layer.on({
                 mouseout: function(e) {
@@ -2512,7 +2515,7 @@
             style: style_River_42_0,
         });
         bounds_group.addLayer(layer_River_42);
-        map.addLayer(layer_River_42);
+        //map.addLayer(layer_River_42);
         function pop_CitiesandVillages_43(feature, layer) {
             layer.on({
                 mouseout: function(e) {
@@ -2828,7 +2831,7 @@
             },
         });
         bounds_group.addLayer(layer_PopulatedPlaces_45);
-        map.addLayer(layer_PopulatedPlaces_45);
+        //map.addLayer(layer_PopulatedPlaces_45);
         function pop_CBA_SCALE_Communities_46(feature, layer) {
             layer.on({
                 mouseout: function(e) {
@@ -3035,7 +3038,7 @@
             style: style_MainRoads_48_0,
         });
         bounds_group.addLayer(layer_MainRoads_48);
-        map.addLayer(layer_MainRoads_48);
+        //map.addLayer(layer_MainRoads_48);
         function pop_SecondaryRoads_49(feature, layer) {
             layer.on({
                 mouseout: function(e) {
@@ -3126,7 +3129,7 @@
             style: style_SecondaryRoads_49_0,
         });
         bounds_group.addLayer(layer_SecondaryRoads_49);
-        map.addLayer(layer_SecondaryRoads_49);
+        //map.addLayer(layer_SecondaryRoads_49);
         function pop_MajorCities_50(feature, layer) {
             layer.on({
                 mouseout: function(e) {
@@ -3211,7 +3214,7 @@
             },
         });
         bounds_group.addLayer(layer_MajorCities_50);
-        map.addLayer(layer_MajorCities_50);
+        //map.addLayer(layer_MajorCities_50);
         function pop_Fishingcenters_51(feature, layer) {
             layer.on({
                 mouseout: function(e) {
@@ -3285,7 +3288,7 @@
             },
         });
         bounds_group.addLayer(layer_Fishingcenters_51);
-        map.addLayer(layer_Fishingcenters_51);
+        //map.addLayer(layer_Fishingcenters_51);
         function pop_Schools_52(feature, layer) {
             layer.on({
                 mouseout: function(e) {
@@ -3463,7 +3466,7 @@
             },
         });
         bounds_group.addLayer(layer_HealthFacilities_53);
-        map.addLayer(layer_HealthFacilities_53);
+        //map.addLayer(layer_HealthFacilities_53);
         const url = {"Nominatim OSM": "https://nominatim.openstreetmap.org/search?format=geojson&addressdetails=1&",
         "France BAN": "https://api-adresse.data.gouv.fr/search/?"}
         var photonControl = L.control.photon({
